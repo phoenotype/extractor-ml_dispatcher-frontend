@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker } from "react-router-dom";
 
+/**
+ * Protegge dalle uscite con modifiche non salvate.
+ * Richiede un data router (createBrowserRouter + RouterProvider).
+ */
 export function useUnsavedGuard(dirty: boolean) {
   const [pendingLeave, setPendingLeave] = useState(false);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
@@ -15,7 +19,8 @@ export function useUnsavedGuard(dirty: boolean) {
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  const blocker = useBlocker(dirty);
+  const shouldBlock = dirty;
+  const blocker = useBlocker(shouldBlock);
 
   useEffect(() => {
     if (blocker.state === "blocked") {
