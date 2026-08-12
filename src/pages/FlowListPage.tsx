@@ -81,7 +81,7 @@ export function FlowListPage() {
     if (!error) return null;
     if (error instanceof ApiError) {
       if (error.isUnauthorized) {
-        return "Autenticazione richiesta (401). Verifica il BFF e DISPATCHER_AUTH_HEADER.";
+        return "Autenticazione richiesta (401). Accedi con Lucy oppure verifica il BFF.";
       }
       if (error.isForbidden) {
         return "Accesso non consentito (403). Contatta un amministratore.";

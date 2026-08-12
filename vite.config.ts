@@ -8,10 +8,10 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, rootDir, "");
-  const dispatcherTarget = (
-    env.DISPATCHER_API_URL ||
-    env.VITE_DISPATCHER_API_URL ||
-    "http://localhost:8000"
+  // Browser never talks to Cloud Run directly. Dev proxy goes to the local BFF.
+  const bffTarget = (
+    env.BFF_URL ||
+    `http://localhost:${env.BFF_PORT || "8787"}`
   ).replace(/\/$/, "");
 
   return {
@@ -24,10 +24,8 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         "/api/dispatcher": {
-          target: dispatcherTarget,
+          target: bffTarget,
           changeOrigin: true,
-          rewrite: (requestPath) =>
-            requestPath.replace(/^\/api\/dispatcher/, "") || "/",
         },
       },
     },

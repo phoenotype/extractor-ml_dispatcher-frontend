@@ -17,6 +17,7 @@ import type {
 } from "@/types/flow";
 import { ApiError, assertOk } from "./client";
 import { getDispatcherConfig } from "./config";
+import { dispatcherFetch } from "./http";
 import {
   mockCatalog,
   mockFlowDetails,
@@ -154,15 +155,7 @@ async function requestJson(
   path: string,
   init?: RequestInit,
 ): Promise<unknown> {
-  const { apiBase } = getDispatcherConfig();
-  const response = await fetch(`${apiBase}${path}`, {
-    ...init,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(init?.headers || {}),
-    },
-  });
+  const response = await dispatcherFetch(path, init);
   return assertOk(response);
 }
 

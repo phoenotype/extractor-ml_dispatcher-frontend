@@ -1,15 +1,45 @@
 import http from "node:http";
 import { URL } from "node:url";
 
+/**
+ * Backend-for-frontend for Extractor ML Dispatcher.
+ *
+ * Browser → Lucy session headers → BFF → Google ID token → private Cloud Run
+ *
+ * Never accept Google ID tokens, API keys, or static cloud credentials from the browser.
+ */
+
 const BFF_PORT = Number(process.env.BFF_PORT || 8787);
 const DISPATCHER_API_URL = (
   process.env.DISPATCHER_API_URL ||
-  process.env.VITE_DISPATCHER_API_URL ||
-  ""
+  "https://extractor-ml-dispatcher-727480764999.europe-west1.run.app"
 ).replace(/\/$/, "");
-const DISPATCHER_AUTH_HEADER = process.env.DISPATCHER_AUTH_HEADER || "";
+const DISPATCHER_AUDIENCE = (
+  process.env.DISPATCHER_AUDIENCE ||
+  DISPATCHER_API_URL
+).replace(/\/$/, "");
+const EXTRACTOR_ML_API_URL = (
+  process.env.EXTRACTOR_ML_API_URL ||
+  "https://extractor-ml-727480764999.europe-west1.run.app"
+).replace(/\/$/, "");
 const VITE_ORIGIN = process.env.VITE_ORIGIN || "http://localhost:5173";
 const PROXY_PREFIX = "/api/dispatcher";
+const SKIP_LUCY_AUTH = process.env.BFF_SKIP_LUCY_AUTH === "true";
+const DEFAULT_ROLE = normalizeRole(process.env.BFF_DEFAULT_ROLE) || "viewer";
+
+/** @type {{ token: string, expiresAt: number } | null} */
+let cachedIdToken = null;
+/** @type {import("google-auth-library").GoogleAuth | null} */
+let googleAuth = null;
+
+const ROLE_RANK = { viewer: 1, editor: 2, operator: 3 };
+
+function normalizeRole(value) {
+  if (value === "viewer" || value === "editor" || value === "operator") {
+    return value;
+  }
+  return null;
+}
 
 function corsHeaders(origin) {
   const allowed =
@@ -20,18 +50,20 @@ function corsHeaders(origin) {
     "Access-Control-Allow-Origin": allowed ? origin || VITE_ORIGIN : VITE_ORIGIN,
     "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers":
-      "Content-Type, Authorization, Accept, X-Requested-With",
+      "Content-Type, Accept, X-Requested-With, X-Endpoint-API-UserInfo, X-Endpoint-API-OTP, X-Dispatcher-Role",
+    "Access-Control-Expose-Headers": "X-Dispatcher-Role",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
 }
 
-function sendJson(res, status, body, origin) {
+function sendJson(res, status, body, origin, extraHeaders = {}) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(payload),
     ...corsHeaders(origin),
+    ...extraHeaders,
   });
   res.end(payload);
 }
@@ -50,14 +82,210 @@ async function readRequestBody(req) {
   return Buffer.concat(chunks);
 }
 
-async function proxyToDispatcher(req, res, targetPath, origin) {
+function requiredRoleFor(method, path) {
+  const normalized = path.replace(/\/+$/, "") || "/";
+  if (method === "POST" && /\/runs$/.test(normalized)) return "operator";
+  if (method === "GET" || method === "HEAD") return "viewer";
+  return "editor";
+}
+
+function roleSatisfies(actual, required) {
+  return (ROLE_RANK[actual] || 0) >= (ROLE_RANK[required] || 99);
+}
+
+function inferRoleFromPrograms(programs) {
+  if (!Array.isArray(programs) || programs.length === 0) return DEFAULT_ROLE;
+  const haystack = programs
+    .flatMap((program) => {
+      const grants = Array.isArray(program.company_grants)
+        ? program.company_grants
+        : [];
+      const actions = Array.isArray(program.actions) ? program.actions : [];
+      return [
+        program.program_name,
+        program.module_link,
+        program.moduleLink,
+        program.url,
+        program.privilege?.priv_code,
+        program.privilege?.priv_name,
+        ...grants.map((g) => g.role_code),
+        ...grants.map((g) => g.priv_code),
+        ...actions.map((a) => a.action_code || a.priv_code || a.code),
+      ];
+    })
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    haystack.includes("operator") ||
+    haystack.includes("dispatch_run") ||
+    haystack.includes("dispatcher_run")
+  ) {
+    return "operator";
+  }
+  if (
+    haystack.includes("editor") ||
+    haystack.includes("dispatch_edit") ||
+    haystack.includes("dispatcher_edit") ||
+    haystack.includes("write")
+  ) {
+    return "editor";
+  }
+  return "viewer";
+}
+
+async function validateLucySession(req) {
+  if (SKIP_LUCY_AUTH) {
+    return {
+      role: normalizeRole(req.headers["x-dispatcher-role"]) || DEFAULT_ROLE,
+      user: { username: "dev" },
+    };
+  }
+
+  const userInfo = req.headers["x-endpoint-api-userinfo"];
+  if (!userInfo || typeof userInfo !== "string") {
+    const error = new Error("Sessione Lucy mancante (X-Endpoint-API-UserInfo)");
+    error.status = 401;
+    throw error;
+  }
+
+  const headers = {
+    Accept: "application/json",
+    "X-Endpoint-API-UserInfo": userInfo,
+  };
+  const otp = req.headers["x-endpoint-api-otp"];
+  if (typeof otp === "string" && otp) {
+    headers["X-Endpoint-API-OTP"] = otp;
+  }
+
+  let response;
+  try {
+    response = await fetch(`${EXTRACTOR_ML_API_URL}/auth/me`, {
+      method: "GET",
+      headers,
+    });
+  } catch (error) {
+    const err = new Error("Impossibile validare la sessione Lucy");
+    err.status = 502;
+    err.cause = error;
+    throw err;
+  }
+
+  if (response.status === 401 || response.status === 403) {
+    const err = new Error("Sessione Lucy non valida o scaduta");
+    err.status = response.status;
+    throw err;
+  }
+  if (!response.ok) {
+    const err = new Error("Validazione sessione Lucy fallita");
+    err.status = 502;
+    throw err;
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  const user = payload?.user ?? payload ?? {};
+  const programs = Array.isArray(payload?.programs) ? payload.programs : [];
+  const requested = normalizeRole(req.headers["x-dispatcher-role"]);
+  const inferred = inferRoleFromPrograms(programs);
+  // UX may request a lower role; never escalate above inferred privilege.
+  const role =
+    requested && roleSatisfies(inferred, requested) ? requested : inferred;
+
+  return { role, user, programs };
+}
+
+async function fetchMetadataIdentityToken(audience) {
+  const metadataUrl = new URL(
+    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity",
+  );
+  metadataUrl.searchParams.set("audience", audience);
+  metadataUrl.searchParams.set("format", "full");
+
+  const response = await fetch(metadataUrl, {
+    headers: { "Metadata-Flavor": "Google" },
+  });
+  if (!response.ok) {
+    throw new Error(`Metadata identity failed (${response.status})`);
+  }
+  return (await response.text()).trim();
+}
+
+async function fetchAdcIdentityToken(audience) {
+  if (!googleAuth) {
+    const { GoogleAuth } = await import("google-auth-library");
+    googleAuth = new GoogleAuth();
+  }
+  const client = await googleAuth.getIdTokenClient(audience);
+  const headers = await client.getRequestHeaders();
+  const authorization = headers.Authorization || headers.authorization;
+  if (!authorization?.startsWith("Bearer ")) {
+    throw new Error("ADC non ha prodotto un ID token Bearer");
+  }
+  return authorization.slice("Bearer ".length);
+}
+
+function decodeJwtExp(token) {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const json = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    return typeof json.exp === "number" ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getGoogleIdToken() {
+  const now = Date.now();
+  if (cachedIdToken && cachedIdToken.expiresAt > now + 60_000) {
+    return cachedIdToken.token;
+  }
+
+  // Local override only (never expose as VITE_*). Prefer ADC / metadata in real envs.
+  const fromEnv = process.env.GOOGLE_ID_TOKEN?.trim();
+  if (fromEnv) {
+    const exp = decodeJwtExp(fromEnv) || now + 45 * 60_000;
+    cachedIdToken = { token: fromEnv, expiresAt: exp };
+    return fromEnv;
+  }
+
+  let token;
+  try {
+    token = await fetchMetadataIdentityToken(DISPATCHER_AUDIENCE);
+  } catch {
+    token = await fetchAdcIdentityToken(DISPATCHER_AUDIENCE);
+  }
+
+  const exp = decodeJwtExp(token) || now + 45 * 60_000;
+  cachedIdToken = { token, expiresAt: exp };
+  return token;
+}
+
+async function proxyToDispatcher(req, res, targetPath, origin, role) {
   if (!DISPATCHER_API_URL) {
     sendJson(
       res,
       500,
+      { detail: "DISPATCHER_API_URL non configurata sul BFF." },
+      origin,
+    );
+    return;
+  }
+
+  let idToken;
+  try {
+    idToken = await getGoogleIdToken();
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "ID token non disponibile";
+    console.error(`[bff] google id token error: ${message}`);
+    sendJson(
+      res,
+      503,
       {
         detail:
-          "DISPATCHER_API_URL non configurata. Impostarla nel BFF o avviare con mock lato client.",
+          "Impossibile ottenere un Google ID token per Cloud Run. Configura ADC, metadata server o GOOGLE_ID_TOKEN (solo server).",
       },
       origin,
     );
@@ -66,18 +294,19 @@ async function proxyToDispatcher(req, res, targetPath, origin) {
 
   const upstreamUrl = new URL(targetPath, `${DISPATCHER_API_URL}/`);
   if (req.url) {
-    const incoming = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+    const incoming = new URL(
+      req.url,
+      `http://${req.headers.host || "localhost"}`,
+    );
     upstreamUrl.search = incoming.search;
   }
 
+  // Only BFF-owned auth toward Cloud Run. Never forward browser Authorization / API keys.
   const headers = {
     Accept: req.headers.accept || "application/json",
     "Content-Type": req.headers["content-type"] || "application/json",
+    Authorization: `Bearer ${idToken}`,
   };
-
-  if (DISPATCHER_AUTH_HEADER) {
-    headers.Authorization = DISPATCHER_AUTH_HEADER;
-  }
 
   const method = req.method || "GET";
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -85,21 +314,20 @@ async function proxyToDispatcher(req, res, targetPath, origin) {
 
   let upstream;
   try {
-    upstream = await fetch(upstreamUrl, {
-      method,
-      headers,
-      body,
-    });
+    upstream = await fetch(upstreamUrl, { method, headers, body });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Errore di rete verso il dispatcher";
-    console.error(`[bff] upstream error ${method} ${upstreamUrl.pathname}: ${message}`);
+    console.error(
+      `[bff] upstream error ${method} ${upstreamUrl.pathname}: ${message}`,
+    );
     sendJson(res, 502, { detail: "Dispatcher non raggiungibile" }, origin);
     return;
   }
 
   const responseHeaders = {
     ...corsHeaders(origin),
+    "X-Dispatcher-Role": role,
   };
   const contentType = upstream.headers.get("content-type");
   if (contentType) responseHeaders["Content-Type"] = contentType;
@@ -108,7 +336,7 @@ async function proxyToDispatcher(req, res, targetPath, origin) {
   responseHeaders["Content-Length"] = String(buffer.byteLength);
 
   console.info(
-    `[bff] ${method} ${PROXY_PREFIX}${targetPath === "/" ? "" : targetPath} -> ${upstream.status}`,
+    `[bff] ${method} ${PROXY_PREFIX}${targetPath === "/" ? "" : targetPath} role=${role} -> ${upstream.status}`,
   );
 
   res.writeHead(upstream.status, responseHeaders);
@@ -118,7 +346,10 @@ async function proxyToDispatcher(req, res, targetPath, origin) {
 const server = http.createServer(async (req, res) => {
   const origin = req.headers.origin;
   const method = req.method || "GET";
-  const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  const requestUrl = new URL(
+    req.url || "/",
+    `http://${req.headers.host || "localhost"}`,
+  );
 
   if (method === "OPTIONS") {
     res.writeHead(204, corsHeaders(origin));
@@ -133,7 +364,11 @@ const server = http.createServer(async (req, res) => {
       {
         status: "ok",
         dispatcherConfigured: Boolean(DISPATCHER_API_URL),
-        authConfigured: Boolean(DISPATCHER_AUTH_HEADER),
+        audience: DISPATCHER_AUDIENCE,
+        lucyAuth: SKIP_LUCY_AUTH ? "skipped" : "required",
+        idTokenMode: process.env.GOOGLE_ID_TOKEN
+          ? "env"
+          : "adc-or-metadata",
       },
       origin,
     );
@@ -146,14 +381,39 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  await proxyToDispatcher(req, res, rewritten, origin);
+  let session;
+  try {
+    session = await validateLucySession(req);
+  } catch (error) {
+    const status = error?.status || 401;
+    sendJson(res, status, { detail: error.message || "Non autenticato" }, origin);
+    return;
+  }
+
+  const required = requiredRoleFor(method, rewritten);
+  if (!roleSatisfies(session.role, required)) {
+    sendJson(
+      res,
+      403,
+      {
+        detail: `Ruolo insufficiente: richiesto ${required}, attuale ${session.role}`,
+      },
+      origin,
+      { "X-Dispatcher-Role": session.role },
+    );
+    return;
+  }
+
+  await proxyToDispatcher(req, res, rewritten, origin, session.role);
 });
 
 server.listen(BFF_PORT, () => {
   console.info(`[bff] listening on http://localhost:${BFF_PORT}`);
-  console.info(`[bff] proxy ${PROXY_PREFIX}/* -> ${DISPATCHER_API_URL || "(unset)"}`);
+  console.info(`[bff] proxy ${PROXY_PREFIX}/* -> ${DISPATCHER_API_URL}`);
+  console.info(`[bff] audience: ${DISPATCHER_AUDIENCE}`);
+  console.info(`[bff] lucy auth: ${EXTRACTOR_ML_API_URL}/auth/me`);
   console.info(`[bff] CORS origin: ${VITE_ORIGIN}`);
   console.info(
-    `[bff] auth header: ${DISPATCHER_AUTH_HEADER ? "configured" : "not set"}`,
+    `[bff] id token: ${process.env.GOOGLE_ID_TOKEN ? "GOOGLE_ID_TOKEN env" : "ADC/metadata"}`,
   );
 });

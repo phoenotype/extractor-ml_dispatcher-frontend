@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { useRole } from "@/hooks/useRole";
 import { useThemeContext } from "@/components/theme/ThemeProvider";
+import { getLucySession, userInitials } from "@/lib/lucy-auth";
+import { clearLucySession } from "@/lib/lucy-auth";
 import type { Role } from "@/types/flow";
 import type { ReactNode } from "react";
 
@@ -20,6 +22,9 @@ export function AppShell({
 }: AppShellProps) {
   const { role, setRole } = useRole();
   const { theme, toggleTheme } = useThemeContext();
+  const session = getLucySession();
+  const displayName =
+    session?.user.full_name || session?.user.username || "Operatore";
 
   return (
     <div className="app">
@@ -66,12 +71,27 @@ export function AppShell({
           </button>
 
           <div className="user-chip" aria-label="Utente corrente">
-            <span className="avatar">AG</span>
+            <span className="avatar">{userInitials(session?.user)}</span>
             <span>
-              <b>Operatore</b>
+              <b>{displayName}</b>
               <small>{role}</small>
             </span>
           </div>
+
+          {session ? (
+            <button
+              type="button"
+              className="icon-button"
+              title="Esci"
+              aria-label="Esci"
+              onClick={() => {
+                clearLucySession();
+                window.location.reload();
+              }}
+            >
+              <LogOut size={17} />
+            </button>
+          ) : null}
         </div>
       </header>
       {children}
