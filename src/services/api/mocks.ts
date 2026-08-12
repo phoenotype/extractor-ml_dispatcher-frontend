@@ -23,6 +23,13 @@ export const mockCatalog: Catalog = {
           source: "exportStatuses",
           label: "Stati iniziali",
         },
+        documentTypes: {
+          type: "array",
+          items: "string",
+          required: false,
+          description: "Tipi documento ammessi; se omesso accetta tutti i tipi",
+          label: "Tipi documento",
+        },
       },
       outputs: ["always"],
     },
@@ -112,7 +119,7 @@ export const starterFlow: FlowDefinition = {
       id: "invoice_in_validation",
       type: "trigger.export_status",
       name: "Fattura in validazione",
-      config: { exportStatuses: [4] },
+      config: { exportStatuses: [4], documentTypes: ["Invoice"] },
       position: { x: 90, y: 175 },
     },
     {

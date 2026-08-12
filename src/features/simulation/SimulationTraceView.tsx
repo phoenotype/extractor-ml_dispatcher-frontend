@@ -3,6 +3,7 @@ import type { SimulationDocument } from "@/types/flow";
 
 interface SimulationTraceViewProps {
   documents: SimulationDocument[];
+  count?: number | null;
   index: number;
   onIndexChange: (index: number) => void;
   loading?: boolean;
@@ -10,6 +11,7 @@ interface SimulationTraceViewProps {
 
 export function SimulationTraceView({
   documents,
+  count,
   index,
   onIndexChange,
   loading,
@@ -20,6 +22,24 @@ export function SimulationTraceView({
         <RefreshCw className="spin" />
         <b>Simulazione in corso…</b>
         <span>Il backend sta valutando i documenti in sola lettura.</span>
+      </div>
+    );
+  }
+
+  const resolvedCount =
+    typeof count === "number" ? count : documents.length;
+  const hasCompletedEmptyRun =
+    typeof count === "number" && count === 0 && documents.length === 0;
+
+  if (hasCompletedEmptyRun) {
+    return (
+      <div className="result-empty">
+        <Play size={25} />
+        <b>Nessun documento trovato</b>
+        <span>
+          Nessun documento soddisfa tutti i criteri del trigger: stato di
+          esportazione, tipo documento e abilitazione aziendale.
+        </span>
       </div>
     );
   }
@@ -39,7 +59,7 @@ export function SimulationTraceView({
 
   return (
     <div className="simulation-result">
-      {documents.length > 1 ? (
+      {documents.length > 1 || resolvedCount > 1 ? (
         <div className="doc-switcher">
           <label>
             Documento
@@ -83,7 +103,9 @@ export function SimulationTraceView({
                 </small>
               ) : null}
             </span>
-            {step.branch ? <em className={String(step.branch)}>{String(step.branch)}</em> : null}
+            {step.branch ? (
+              <em className={String(step.branch)}>{String(step.branch)}</em>
+            ) : null}
           </div>
         ))}
       </div>

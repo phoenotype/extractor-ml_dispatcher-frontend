@@ -88,6 +88,7 @@ export function FlowEditorPage() {
   const [simulationDocs, setSimulationDocs] = useState<SimulationDocument[]>(
     [],
   );
+  const [simulationCount, setSimulationCount] = useState<number | null>(null);
   const [simulationIndex, setSimulationIndex] = useState(0);
   const [recentSimulationAt, setRecentSimulationAt] = useState<number | null>(
     null,
@@ -279,7 +280,14 @@ export function FlowEditorPage() {
     if (!target) return;
     const previousId = target.id;
     Object.assign(target, patch);
-    if (config) target.config = { ...target.config, ...config };
+    if (config) {
+      const merged = { ...target.config };
+      for (const [key, value] of Object.entries(config)) {
+        if (value === undefined) delete merged[key];
+        else merged[key] = value;
+      }
+      target.config = merged;
+    }
     if (patch.id && patch.id !== previousId) {
       next.edges = next.edges.map((edge) => ({
         ...edge,
@@ -298,10 +306,9 @@ export function FlowEditorPage() {
     const count = next.nodes.filter((node) => node.type === type).length + 1;
     const id = `${type.split(".").pop()?.replace(/[^a-z]/g, "_")}_${count}`;
     const config = Object.fromEntries(
-      Object.entries(definition.configSchema).map(([key, field]) => [
-        key,
-        defaultFieldValue(field, catalog),
-      ]),
+      Object.entries(definition.configSchema)
+        .map(([key, field]) => [key, defaultFieldValue(field, catalog, key)] as const)
+        .filter((entry) => entry[1] !== undefined),
     );
     next.nodes.push({
       id,
@@ -449,11 +456,15 @@ export function FlowEditorPage() {
           batchSize,
         },
       });
-      const docs =
-        result.data.documents && result.data.documents.length
-          ? result.data.documents
-          : [result.data];
+      const docs = Array.isArray(result.data.documents)
+        ? result.data.documents
+        : result.data.trace
+          ? [result.data]
+          : [];
+      const count =
+        typeof result.data.count === "number" ? result.data.count : docs.length;
       setSimulationDocs(docs);
+      setSimulationCount(count);
       setSimulationIndex(0);
       setRecentSimulationAt(Date.now());
     } catch (error) {
@@ -741,6 +752,7 @@ export function FlowEditorPage() {
           validation={validation}
           validationLoading={busy === "validate"}
           simulationDocs={simulationDocs}
+          simulationCount={simulationCount}
           simulationIndex={simulationIndex}
           onSimulationIndexChange={setSimulationIndex}
           simulationLoading={busy === "simulate"}

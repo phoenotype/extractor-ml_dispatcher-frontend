@@ -1,5 +1,9 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { nodeVisual, type FlowNodeData } from "@/features/flows/flow-utils";
+import {
+  formatTriggerSummary,
+  nodeVisual,
+  type FlowNodeData,
+} from "@/features/flows/flow-utils";
 
 export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) {
   const def = data.definition;
@@ -8,7 +12,7 @@ export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) 
   const Icon = meta.icon;
   const detail =
     def.type === "trigger.export_status"
-      ? `Stati: ${((def.config.exportStatuses as number[]) || []).join(", ")}`
+      ? formatTriggerSummary(def.config)
       : def.type === "condition"
         ? `${String(def.config.field || "Campo")} · ${String(def.config.operator || "eq")}`
         : def.type === "action.update_export_status"
@@ -26,7 +30,9 @@ export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) 
       <div className="node-copy">
         <span>{catalogDefinition.label}</span>
         <strong>{def.name}</strong>
-        <small>{detail}</small>
+        <small className={def.type === "trigger.export_status" ? "multiline" : undefined}>
+          {detail}
+        </small>
       </div>
       {catalogDefinition.outputs.map((output, index) => (
         <div key={output}>

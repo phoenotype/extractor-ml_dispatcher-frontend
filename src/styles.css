@@ -914,6 +914,77 @@ button {
 .node-copy small {
   font-size: 9px;
   color: #7e8997;
+  white-space: normal;
+}
+.node-copy small.multiline {
+  white-space: pre-line;
+  line-height: 1.35;
+}
+.field-hint {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #6c6c6c;
+  line-height: 1.4;
+}
+.document-types-field .tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+.document-types-field .tag-empty {
+  font-size: 12px;
+  color: #767b8b;
+  font-style: italic;
+}
+.document-types-field .tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e1e1e1;
+  background: #dfe9ea;
+  color: #247079;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.document-types-field .tag-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.document-types-field .tag-input-row input {
+  flex: 1;
+  height: 36px;
+  border: 1px solid #e1e1e1;
+  border-radius: 4px;
+  padding: 0 10px;
+}
+.document-types-field .tag-input-row button {
+  border: 1px solid #247079;
+  background: #247079;
+  color: #fff;
+  border-radius: 4px;
+  padding: 0 12px;
+  height: 36px;
+  cursor: pointer;
+}
+.document-types-field .tag-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.document-types-field .tag-suggestions button {
+  border: 1px dashed #c9d4d6;
+  background: #fff;
+  color: #247079;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
 }
 .port-label {
   position: absolute;
@@ -1821,6 +1892,17 @@ html[data-theme="dark"] .row-menu {
 }
 html[data-theme="dark"] .canvas { background: #101517; }
 html[data-theme="dark"] .editor-page { background: #101517; }
+html[data-theme="dark"] .document-types-field .tag-chip {
+  background: #1f2d31;
+  border-color: #3a4a50;
+  color: #8fd0d8;
+}
+html[data-theme="dark"] .document-types-field .tag-input-row input,
+html[data-theme="dark"] .document-types-field .tag-suggestions button {
+  background: #101517;
+  border-color: var(--line);
+  color: var(--ink);
+}
 
 .login-page {
   display: grid;

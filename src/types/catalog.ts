@@ -14,6 +14,7 @@ export interface CatalogConfigField {
   requiredExceptFor?: string[];
   source?: "documentFields" | "exportStatuses";
   label?: string;
+  description?: string;
 }
 
 export interface CatalogNodeType {

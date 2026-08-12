@@ -134,6 +134,7 @@ export const catalogConfigFieldSchema = z
     requiredExceptFor: z.array(z.string()).optional(),
     source: z.enum(["documentFields", "exportStatuses"]).optional(),
     label: z.string().optional(),
+    description: z.string().optional(),
   })
   .passthrough();
 

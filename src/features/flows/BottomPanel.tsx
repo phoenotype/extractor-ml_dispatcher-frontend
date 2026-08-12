@@ -25,6 +25,7 @@ interface BottomPanelProps {
   validation: ValidationResult | null;
   validationLoading: boolean;
   simulationDocs: SimulationDocument[];
+  simulationCount?: number | null;
   simulationIndex: number;
   onSimulationIndexChange: (index: number) => void;
   simulationLoading: boolean;
@@ -43,6 +44,7 @@ export function BottomPanel({
   validation,
   validationLoading,
   simulationDocs,
+  simulationCount = null,
   simulationIndex,
   onSimulationIndexChange,
   simulationLoading,
@@ -106,6 +108,7 @@ export function BottomPanel({
             {tab === "simulation" ? (
               <SimulationTraceView
                 documents={simulationDocs}
+                count={simulationCount}
                 index={simulationIndex}
                 onIndexChange={onSimulationIndexChange}
                 loading={simulationLoading}

@@ -98,16 +98,26 @@ export function normalizeFlowDefinition(
       typeof definition.flowName === "string" && definition.flowName
         ? definition.flowName
         : fallbackName || "flusso",
-    nodes: definition.nodes.map((node) => ({
-      id: node.id,
-      type: node.type,
-      name: node.name,
-      config:
+    nodes: definition.nodes.map((node) => {
+      const config =
         node.config && typeof node.config === "object"
-          ? (node.config as Record<string, unknown>)
-          : {},
-      position: node.position,
-    })),
+          ? { ...(node.config as Record<string, unknown>) }
+          : {};
+      // Empty documentTypes means "all types" — omit the key from JSON.
+      if (
+        Array.isArray(config.documentTypes) &&
+        config.documentTypes.length === 0
+      ) {
+        delete config.documentTypes;
+      }
+      return {
+        id: node.id,
+        type: node.type,
+        name: node.name,
+        config,
+        position: node.position,
+      };
+    }),
     edges: definition.edges.map((edge) => ({
       source: edge.source,
       target: edge.target,
@@ -142,8 +152,10 @@ export function parseCatalogValue(
 export function defaultFieldValue(
   field: CatalogConfigField,
   catalog: Catalog,
+  fieldKey?: string,
 ): unknown {
-  if (field.source === "exportStatuses") {
+  const key = fieldKey || "";
+  if (field.source === "exportStatuses" || key === "exportStatuses") {
     return field.type === "array"
       ? [catalog.exportStatuses[0]?.value].filter((value) => value !== undefined)
       : catalog.exportStatuses[0]?.value;
@@ -151,11 +163,27 @@ export function defaultFieldValue(
   if (field.source === "documentFields") {
     return catalog.documentFields[0]?.path || "";
   }
+  // Optional documentTypes: omit from config so the trigger accepts all types.
+  if (key === "documentTypes" || (field.type === "array" && field.items === "string" && !field.required)) {
+    return undefined;
+  }
   if (field.type === "enum") return field.values?.[0];
   if (field.type === "array") return [];
   if (field.type === "number") return 0;
   if (field.type === "boolean") return false;
   return "";
+}
+
+export function formatTriggerSummary(config: Record<string, unknown>): string {
+  const statuses = Array.isArray(config.exportStatuses)
+    ? config.exportStatuses.map(String)
+    : [];
+  const types = Array.isArray(config.documentTypes)
+    ? config.documentTypes.map(String).filter(Boolean)
+    : null;
+  const statusLine = `Stati: ${statuses.length ? statuses.join(", ") : "—"}`;
+  const typesLine = `Tipi: ${types && types.length ? types.join(", ") : "Tutti"}`;
+  return `${statusLine}\n${typesLine}`;
 }
 
 export function toFlowNodes(

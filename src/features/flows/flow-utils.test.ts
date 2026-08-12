@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultFieldValue,
+  formatTriggerSummary,
   preliminaryValidate,
   slug,
   toFlowEdges,
@@ -21,6 +23,12 @@ const catalog: Catalog = {
           items: "number",
           required: true,
           source: "exportStatuses",
+        },
+        documentTypes: {
+          type: "array",
+          items: "string",
+          required: false,
+          description: "Tipi documento ammessi; se omesso accetta tutti i tipi",
         },
       },
       outputs: ["always"],
@@ -73,12 +81,38 @@ describe("toFlowEdges", () => {
       schemaVersion: 1 as const,
       flowName: "demo",
       nodes: [],
-      edges: [{ source: "t", target: "a" } as { source: string; target: string; branch?: string }],
+      edges: [
+        {
+          source: "t",
+          target: "a",
+        } as { source: string; target: string; branch?: string },
+      ],
       settings: { requiresExplicitOptIn: true },
     };
     const edges = toFlowEdges(flow as FlowDefinition);
     expect(edges[0].sourceHandle).toBeUndefined();
     expect(edges[0].label).toBeUndefined();
+  });
+});
+
+describe("formatTriggerSummary", () => {
+  it("mostra tipi selezionati o Tutti", () => {
+    expect(
+      formatTriggerSummary({
+        exportStatuses: [4, 90],
+        documentTypes: ["Invoice", "Commercial Invoice"],
+      }),
+    ).toBe("Stati: 4, 90\nTipi: Invoice, Commercial Invoice");
+    expect(formatTriggerSummary({ exportStatuses: [4] })).toBe(
+      "Stati: 4\nTipi: Tutti",
+    );
+  });
+});
+
+describe("defaultFieldValue", () => {
+  it("omite documentTypes opzionali", () => {
+    const field = catalog.nodeTypes[0].configSchema.documentTypes;
+    expect(defaultFieldValue(field, catalog, "documentTypes")).toBeUndefined();
   });
 });
 
