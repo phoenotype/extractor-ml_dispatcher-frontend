@@ -27,6 +27,7 @@ import {
   defaultFieldValue,
   downloadJson,
   isVisualFlow,
+  normalizeFlowDefinition,
   preliminaryValidate,
   slug,
   toFlowEdges,
@@ -207,8 +208,13 @@ export function FlowEditorPage() {
         const draftRaw = localStorage.getItem(
           `dispatcher-draft:${remote.flowName}`,
         );
-        const draft = draftRaw ? (JSON.parse(draftRaw) as { flow?: FlowDefinition }) : null;
-        const next = draft?.flow || cloneFlow(definition);
+        const draft = draftRaw
+          ? (JSON.parse(draftRaw) as { flow?: FlowDefinition })
+          : null;
+        const next = normalizeFlowDefinition(
+          draft?.flow || definition,
+          remote.flowName,
+        );
         setLegacy(false);
         setLegacyPayload(null);
         setFlow(next);
@@ -600,6 +606,16 @@ export function FlowEditorPage() {
     const ok = await unsaved.requestLeave();
     if (ok || !dirty) navigate("/");
   };
+
+  if (catalogQuery.isError) {
+    return (
+      <main className="app editor-page">
+        <div className="empty">
+          Impossibile caricare il catalogo nodi. Torna all&apos;elenco e riprova.
+        </div>
+      </main>
+    );
+  }
 
   if (loading || !catalog) {
     return (

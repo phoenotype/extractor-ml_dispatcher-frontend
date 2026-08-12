@@ -74,6 +74,49 @@ export function isVisualFlow(
   );
 }
 
+/** Normalizza definizioni backend incomplete (es. edge senza branch). */
+export function normalizeFlowDefinition(
+  definition: FlowDefinition | Record<string, unknown>,
+  fallbackName?: string,
+): FlowDefinition {
+  if (!isVisualFlow(definition)) {
+    throw new Error("Definizione flusso non visual_v1");
+  }
+  const settings =
+    definition.settings && typeof definition.settings === "object"
+      ? {
+          requiresExplicitOptIn: Boolean(
+            (definition.settings as { requiresExplicitOptIn?: unknown })
+              .requiresExplicitOptIn,
+          ),
+        }
+      : { requiresExplicitOptIn: true };
+
+  return {
+    schemaVersion: 1,
+    flowName:
+      typeof definition.flowName === "string" && definition.flowName
+        ? definition.flowName
+        : fallbackName || "flusso",
+    nodes: definition.nodes.map((node) => ({
+      id: node.id,
+      type: node.type,
+      name: node.name,
+      config:
+        node.config && typeof node.config === "object"
+          ? (node.config as Record<string, unknown>)
+          : {},
+      position: node.position,
+    })),
+    edges: definition.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      branch: edge.branch || "always",
+    })),
+    settings,
+  };
+}
+
 export function parseCatalogValue(
   value: string,
   field: CatalogConfigField,
@@ -145,18 +188,19 @@ export function toFlowEdges(
     const id = `${edge.source}-${edge.target}-${index}`;
     const active = traced.has(id);
     const grayInactive = options?.grayInactive && traced.size > 0 && !active;
+    const branch = edge.branch || "always";
     const branchColor =
-      edge.branch === "true"
+      branch === "true"
         ? "#11835b"
-        : edge.branch === "false"
+        : branch === "false"
           ? "#c04545"
           : "#6a7482";
     return {
       id,
       source: edge.source,
       target: edge.target,
-      sourceHandle: edge.branch === "always" ? undefined : edge.branch,
-      label: edge.branch === "always" ? undefined : edge.branch.toUpperCase(),
+      sourceHandle: branch === "always" ? undefined : branch,
+      label: branch === "always" ? undefined : branch.toUpperCase(),
       animated: active,
       style: {
         stroke: active ? "#17a673" : grayInactive ? "#c5ccd4" : branchColor,

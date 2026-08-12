@@ -18,7 +18,7 @@ export const flowNodeDefinitionSchema = z.object({
 export const flowEdgeDefinitionSchema = z.object({
   source: z.string(),
   target: z.string(),
-  branch: z.string(),
+  branch: z.string().optional().default("always"),
 });
 
 export const flowDefinitionSchema = z.object({

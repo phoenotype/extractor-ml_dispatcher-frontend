@@ -67,6 +67,19 @@ describe("toFlowEdges", () => {
     expect(edges[2].sourceHandle).toBeUndefined();
     expect(edges[0].label).toBe("TRUE");
   });
+
+  it("tollera edge senza branch (default always)", () => {
+    const flow = {
+      schemaVersion: 1 as const,
+      flowName: "demo",
+      nodes: [],
+      edges: [{ source: "t", target: "a" } as { source: string; target: string; branch?: string }],
+      settings: { requiresExplicitOptIn: true },
+    };
+    const edges = toFlowEdges(flow as FlowDefinition);
+    expect(edges[0].sourceHandle).toBeUndefined();
+    expect(edges[0].label).toBeUndefined();
+  });
 });
 
 describe("preliminaryValidate", () => {

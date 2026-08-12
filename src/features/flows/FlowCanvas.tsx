@@ -3,6 +3,7 @@ import {
   Controls,
   MiniMap,
   ReactFlow,
+  ReactFlowProvider,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -26,7 +27,17 @@ interface FlowCanvasProps {
   onSelect: (nodeId: string | null) => void;
 }
 
-export function FlowCanvas({
+export function FlowCanvas(props: FlowCanvasProps) {
+  return (
+    <div className="canvas">
+      <ReactFlowProvider>
+        <FlowCanvasInner {...props} />
+      </ReactFlowProvider>
+    </div>
+  );
+}
+
+function FlowCanvasInner({
   nodes,
   edges,
   readOnly,
@@ -36,42 +47,41 @@ export function FlowCanvas({
   onSelect,
 }: FlowCanvasProps) {
   return (
-    <div className="canvas">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        nodeTypes={nodeTypes}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={(_, node) => onSelect(node.id)}
-        onSelectionChange={(params: OnSelectionChangeParams) => {
-          onSelect(params.nodes[0]?.id ?? null);
+    <ReactFlow
+      nodes={nodes}
+      edges={edges}
+      nodeTypes={nodeTypes}
+      onNodesChange={onNodesChange}
+      onEdgesChange={onEdgesChange}
+      onConnect={onConnect}
+      onNodeClick={(_, node) => onSelect(node.id)}
+      onSelectionChange={(params: OnSelectionChangeParams) => {
+        onSelect(params.nodes[0]?.id ?? null);
+      }}
+      fitView
+      nodesDraggable={!readOnly}
+      nodesConnectable={!readOnly}
+      elementsSelectable
+      multiSelectionKeyCode="Shift"
+      deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
+      proOptions={{ hideAttribution: true }}
+      style={{ width: "100%", height: "100%" }}
+    >
+      <Background color="#dbe1e9" gap={22} size={1} />
+      <Controls showInteractive={false} />
+      <MiniMap
+        pannable
+        zoomable
+        nodeColor={(node) => {
+          const color = nodeVisual(
+            (node.data as FlowNodeData).catalogDefinition,
+          ).color;
+          if (color === "violet") return "#247079";
+          if (color === "amber") return "#d49a31";
+          if (color === "blue") return "#3d83cd";
+          return "#718093";
         }}
-        fitView
-        nodesDraggable={!readOnly}
-        nodesConnectable={!readOnly}
-        elementsSelectable
-        multiSelectionKeyCode="Shift"
-        deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background color="#dbe1e9" gap={22} size={1} />
-        <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          nodeColor={(node) => {
-            const color = nodeVisual(
-              (node.data as FlowNodeData).catalogDefinition,
-            ).color;
-            if (color === "violet") return "#247079";
-            if (color === "amber") return "#d49a31";
-            if (color === "blue") return "#3d83cd";
-            return "#718093";
-          }}
-        />
-      </ReactFlow>
-    </div>
+      />
+    </ReactFlow>
   );
 }
