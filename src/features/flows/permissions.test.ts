@@ -3,6 +3,8 @@ import {
   canEditFlows,
   canRunFlows,
   canRunNow,
+  canSimulate,
+  canValidate,
   isReadOnlyRole,
 } from "./permissions";
 
@@ -11,6 +13,8 @@ describe("permissions", () => {
     expect(isReadOnlyRole("viewer")).toBe(true);
     expect(canEditFlows("viewer")).toBe(false);
     expect(canRunFlows("viewer")).toBe(false);
+    expect(canValidate("viewer")).toBe(true);
+    expect(canSimulate("viewer")).toBe(true);
   });
 
   it("editor può modificare ma non eseguire", () => {

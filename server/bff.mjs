@@ -85,6 +85,12 @@ async function readRequestBody(req) {
 function requiredRoleFor(method, path) {
   const normalized = path.replace(/\/+$/, "") || "/";
   if (method === "POST" && /\/runs$/.test(normalized)) return "operator";
+  if (
+    method === "POST" &&
+    (/\/simulations$/.test(normalized) || /\/validate$/.test(normalized))
+  ) {
+    return "viewer";
+  }
   if (method === "GET" || method === "HEAD") return "viewer";
   return "editor";
 }

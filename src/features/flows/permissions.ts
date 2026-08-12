@@ -9,11 +9,11 @@ export function canRunFlows(role: Role): boolean {
 }
 
 export function canValidate(role: Role): boolean {
-  return role !== "viewer";
+  return role === "viewer" || role === "editor" || role === "operator";
 }
 
 export function canSimulate(role: Role): boolean {
-  return role !== "viewer";
+  return role === "viewer" || role === "editor" || role === "operator";
 }
 
 export function canActivate(role: Role): boolean {
