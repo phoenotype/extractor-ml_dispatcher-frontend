@@ -82,17 +82,27 @@ async function readRequestBody(req) {
   return Buffer.concat(chunks);
 }
 
-function requiredRoleFor(method, path) {
+function requiredActionFor(method, path) {
   const normalized = path.replace(/\/+$/, "") || "/";
-  if (method === "POST" && /\/runs$/.test(normalized)) return "operator";
-  if (
-    method === "POST" &&
-    (/\/simulations$/.test(normalized) || /\/validate$/.test(normalized))
-  ) {
-    return "viewer";
+  if (method === "POST" && /\/runs$/.test(normalized)) {
+    return "DISPATCHER_RUN";
   }
-  if (method === "GET" || method === "HEAD") return "viewer";
-  return "editor";
+  if (method === "POST" && /\/simulations$/.test(normalized)) {
+    return "DISPATCHER_SIMULATE";
+  }
+  if (method === "POST" && /\/validate$/.test(normalized)) {
+    return "DISPATCHER_VALIDATE";
+  }
+  if (method === "POST" && normalized === "/flows") {
+    return "DISPATCHER_CREATE";
+  }
+  if (method === "PUT" || method === "PATCH") {
+    return "DISPATCHER_EDIT";
+  }
+  if (method === "DELETE") {
+    return "DISPATCHER_DEACTIVATE";
+  }
+  return "DISPATCHER_VIEW";
 }
 
 function roleSatisfies(actual, required) {
@@ -141,11 +151,45 @@ function inferRoleFromPrograms(programs) {
   return "viewer";
 }
 
+function dispatcherActionsFromPrograms(programs) {
+  if (!Array.isArray(programs)) return new Set();
+  return new Set(
+    programs
+      .filter(
+        (program) =>
+          String(program.module_link || program.moduleLink || "").toLowerCase() ===
+          "dispatcher",
+      )
+      .flatMap((program) =>
+        Array.isArray(program.actions) ? program.actions : [],
+      )
+      .map((action) => String(action.action_code || "").toUpperCase())
+      .filter(Boolean),
+  );
+}
+
+function devActionsForRole(role) {
+  const actions = new Set([
+    "DISPATCHER_VIEW",
+    "DISPATCHER_VALIDATE",
+    "DISPATCHER_SIMULATE",
+  ]);
+  if (roleSatisfies(role, "editor")) {
+    actions.add("DISPATCHER_CREATE");
+    actions.add("DISPATCHER_EDIT");
+    actions.add("DISPATCHER_DEACTIVATE");
+  }
+  if (roleSatisfies(role, "operator")) actions.add("DISPATCHER_RUN");
+  return actions;
+}
+
 async function validateLucySession(req) {
   if (SKIP_LUCY_AUTH) {
+    const role = normalizeRole(req.headers["x-dispatcher-role"]) || DEFAULT_ROLE;
     return {
-      role: normalizeRole(req.headers["x-dispatcher-role"]) || DEFAULT_ROLE,
+      role,
       user: { username: "dev" },
+      actions: devActionsForRole(role),
     };
   }
 
@@ -198,7 +242,7 @@ async function validateLucySession(req) {
   const role =
     requested && roleSatisfies(inferred, requested) ? requested : inferred;
 
-  return { role, user, programs };
+  return { role, user, programs, actions: dispatcherActionsFromPrograms(programs) };
 }
 
 async function fetchMetadataIdentityToken(audience) {
@@ -396,13 +440,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const required = requiredRoleFor(method, rewritten);
-  if (!roleSatisfies(session.role, required)) {
+  const required = requiredActionFor(method, rewritten);
+  if (!session.actions.has(required)) {
     sendJson(
       res,
       403,
       {
-        detail: `Ruolo insufficiente: richiesto ${required}, attuale ${session.role}`,
+        detail: `Permesso insufficiente: richiesto ${required}`,
       },
       origin,
       { "X-Dispatcher-Role": session.role },
