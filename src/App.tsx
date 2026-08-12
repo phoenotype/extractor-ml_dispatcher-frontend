@@ -1,4 +1,8 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import {
+  Navigate,
+  RouterProvider,
+  createBrowserRouter,
+} from "react-router-dom";
 import {
   LoginScreen,
   useLucyAuth,
@@ -6,6 +10,13 @@ import {
 import { FlowEditorPage } from "@/pages/FlowEditorPage";
 import { FlowListPage } from "@/pages/FlowListPage";
 import { getDispatcherConfig } from "@/services/api/config";
+
+const router = createBrowserRouter([
+  { path: "/", element: <FlowListPage /> },
+  { path: "/flows/new", element: <FlowEditorPage /> },
+  { path: "/flows/:flowName", element: <FlowEditorPage /> },
+  { path: "*", element: <Navigate to="/" replace /> },
+]);
 
 export default function App() {
   const { session, setSession } = useLucyAuth();
@@ -15,12 +26,5 @@ export default function App() {
     return <LoginScreen onAuthenticated={setSession} />;
   }
 
-  return (
-    <Routes>
-      <Route path="/" element={<FlowListPage />} />
-      <Route path="/flows/new" element={<FlowEditorPage />} />
-      <Route path="/flows/:flowName" element={<FlowEditorPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <RouterProvider router={router} />;
 }
