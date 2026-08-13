@@ -36,7 +36,7 @@ export function FlowFilters({
           onChange={(event) =>
             onChange({ ...value, search: event.target.value })
           }
-          placeholder="Cerca per nome, descrizione o tipo documento…"
+          placeholder="Cerca per nome, descrizione o categoria…"
         />
       </label>
       <div className="filter-buttons">
@@ -69,7 +69,7 @@ export function FlowFilters({
         </div>
         <div className="filter-menu">
           <button type="button" onClick={() => setOpenDoc((v) => !v)}>
-            {value.documentType || "Tipo documento"} <ChevronDown size={14} />
+            {value.documentType || "Categoria descrittiva"} <ChevronDown size={14} />
           </button>
           {openDoc ? (
             <div className="filter-dropdown">

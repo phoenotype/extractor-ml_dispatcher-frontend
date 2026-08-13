@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   addEdge,
@@ -26,9 +26,12 @@ import {
   createBlankFlow,
   defaultFieldValue,
   downloadJson,
+  formatTriggerSummary,
+  getFlowTriggerSummary,
   isVisualFlow,
   normalizeFlowDefinition,
   preliminaryValidate,
+  sanitizeDocumentTypes,
   slug,
   toFlowEdges,
   toFlowNodes,
@@ -283,6 +286,12 @@ export function FlowEditorPage() {
     if (config) {
       const merged = { ...target.config };
       for (const [key, value] of Object.entries(config)) {
+        if (key === "documentTypes") {
+          const sanitized = sanitizeDocumentTypes(value);
+          if (sanitized) merged.documentTypes = sanitized;
+          else delete merged.documentTypes;
+          continue;
+        }
         if (value === undefined) delete merged[key];
         else merged[key] = value;
       }
@@ -595,12 +604,20 @@ export function FlowEditorPage() {
       if (parsed.schemaVersion !== 1) {
         throw new Error("È supportato solo schemaVersion: 1");
       }
-      commitFlow(parsed);
+      commitFlow(normalizeFlowDefinition(parsed, flow.flowName));
       setJsonError(null);
     } catch (error) {
       setJsonError(error instanceof Error ? error.message : "JSON non valido");
     }
   };
+
+  const triggerCriteria = useMemo(() => getFlowTriggerSummary(flow), [flow]);
+  const triggerSummaryText = useMemo(() => {
+    const trigger = flow.nodes.find(
+      (node) => node.type === "trigger.export_status",
+    );
+    return trigger ? formatTriggerSummary(trigger.config) : null;
+  }, [flow]);
 
   const hasRecentSimulation =
     recentSimulationAt != null && Date.now() - recentSimulationAt < 30 * 60_000;
@@ -650,6 +667,9 @@ export function FlowEditorPage() {
         canRun={runEnabled}
         canUndo={history.current.length > 0}
         canRedo={future.current.length > 0}
+        categoryLabel={documentType}
+        triggerStatusLine={triggerCriteria?.statusLine}
+        triggerTypesLine={triggerCriteria?.typesLine}
         onBack={() => void goBack()}
         onRename={(value) => {
           const next = cloneFlow(flow);
@@ -662,6 +682,7 @@ export function FlowEditorPage() {
         onSimulate={() => setShowSimModal(true)}
         onSave={() => void save()}
         onRun={() => setShowRunModal(true)}
+        onCategoryChange={setDocumentType}
       />
 
       {legacy ? (
@@ -756,6 +777,7 @@ export function FlowEditorPage() {
           simulationIndex={simulationIndex}
           onSimulationIndexChange={setSimulationIndex}
           simulationLoading={busy === "simulate"}
+          triggerSummary={triggerSummaryText}
           jsonDraft={jsonDraft}
           jsonError={jsonError}
           onJsonChange={setJsonDraft}

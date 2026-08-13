@@ -42,7 +42,7 @@ export function FlowListTable({
         <div className="table-head">
           <span>Nome</span>
           <span>Descrizione</span>
-          <span>Tipo documento</span>
+          <span>Categoria descrittiva</span>
           <span>Stato</span>
           <span>Formato</span>
           <span>Modificabilità</span>
@@ -73,7 +73,7 @@ export function FlowListTable({
       <div className="table-head table-head-wide">
         <span>Nome</span>
         <span>Descrizione</span>
-        <span>Tipo documento</span>
+        <span>Categoria descrittiva</span>
         <span>Stato</span>
         <span>Formato</span>
         <span>Modificabilità</span>

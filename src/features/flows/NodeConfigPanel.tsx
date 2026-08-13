@@ -2,8 +2,10 @@ import { useMemo, useState } from "react";
 import { Copy, Pause, Settings2, Trash2, X } from "lucide-react";
 import {
   catalogNode,
+  ensureTriggerConfigSchema,
   nodeVisual,
   parseCatalogValue,
+  sanitizeDocumentTypes,
   slug,
 } from "@/features/flows/flow-utils";
 import type { Catalog, CatalogConfigField } from "@/types/catalog";
@@ -81,7 +83,7 @@ function DynamicNodeForm({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const definition = catalogNode(catalog, node.type);
+  const definition = ensureTriggerConfigSchema(catalogNode(catalog, node.type));
   const visual = nodeVisual(definition);
   const Icon = visual.icon;
 
@@ -169,7 +171,9 @@ function isDocumentTypesField(fieldKey: string, field: CatalogConfigField) {
     fieldKey === "documentTypes" ||
     (field.type === "array" &&
       field.items === "string" &&
-      /document.?type/i.test(fieldKey + (field.description || "") + (field.label || "")))
+      /document.?type/i.test(
+        fieldKey + (field.description || "") + (field.label || ""),
+      ))
   );
 }
 
@@ -191,14 +195,11 @@ function DynamicConfigField({
   onChange: (value: unknown) => void;
 }) {
   if (field.requiredExceptFor?.includes(String(config.operator))) return null;
-  const label =
-    field.label ||
-    fieldKey.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
 
   if (field.source === "documentFields") {
     return (
       <label>
-        {label}
+        {field.label || fieldKey}
         <select
           disabled={disabled}
           value={String(value ?? "")}
@@ -218,31 +219,36 @@ function DynamicConfigField({
   if (isExportStatusesField(fieldKey, field) && field.type === "array") {
     const selected = Array.isArray(value) ? value.map(Number) : [];
     return (
-      <fieldset className="dynamic-checks">
-        <legend>{label}</legend>
-        {field.description ? (
-          <p className="field-hint">{field.description}</p>
-        ) : null}
-        {catalog.exportStatuses.map((status) => (
-          <label key={status.value}>
-            <input
-              type="checkbox"
-              disabled={disabled}
-              checked={selected.includes(status.value)}
-              onChange={(event) =>
-                onChange(
-                  event.target.checked
-                    ? [...selected, status.value]
-                    : selected.filter((item) => item !== status.value),
-                )
-              }
-            />
-            <span>
-              {status.label}
-              <small>{status.value}</small>
-            </span>
-          </label>
-        ))}
+      <fieldset className="dynamic-checks export-statuses-field">
+        <legend>Stati di esportazione</legend>
+        <p className="field-hint">Seleziona almeno uno stato iniziale.</p>
+        <div className="status-chip-list">
+          {catalog.exportStatuses.map((status) => {
+            const checked = selected.includes(status.value);
+            return (
+              <label
+                key={status.value}
+                className={`status-chip ${checked ? "selected" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  disabled={disabled}
+                  checked={checked}
+                  onChange={(event) =>
+                    onChange(
+                      event.target.checked
+                        ? [...selected, status.value]
+                        : selected.filter((item) => item !== status.value),
+                    )
+                  }
+                />
+                <span>
+                  {status.value} — {status.label}
+                </span>
+              </label>
+            );
+          })}
+        </div>
       </fieldset>
     );
   }
@@ -250,7 +256,7 @@ function DynamicConfigField({
   if (isExportStatusesField(fieldKey, field)) {
     return (
       <label>
-        {label}
+        {field.label || "Stato di esportazione"}
         <select
           disabled={disabled}
           value={String(value ?? "")}
@@ -259,7 +265,7 @@ function DynamicConfigField({
           <option value="">Seleziona uno stato…</option>
           {catalog.exportStatuses.map((status) => (
             <option key={status.value} value={status.value}>
-              {status.label} ({status.value})
+              {status.value} — {status.label}
             </option>
           ))}
         </select>
@@ -270,23 +276,25 @@ function DynamicConfigField({
   if (isDocumentTypesField(fieldKey, field)) {
     return (
       <DocumentTypesField
-        label={label}
-        description={
-          field.description ||
-          "Se non selezioni tipi documento, il trigger considera tutti i tipi"
-        }
         value={value}
         disabled={disabled}
-        suggestions={field.values?.map(String) || [
-          "Invoice",
-          "Commercial Invoice",
-          "Delivery Note",
-          "Proof of Delivery",
-        ]}
+        suggestions={
+          field.values?.map(String) || [
+            "Invoice",
+            "Commercial Invoice",
+            "Delivery Note",
+            "Proof of Delivery",
+            "Receipt",
+          ]
+        }
         onChange={onChange}
       />
     );
   }
+
+  const label =
+    field.label ||
+    fieldKey.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
 
   if (field.type === "enum") {
     return (
@@ -341,30 +349,24 @@ function DynamicConfigField({
 }
 
 function DocumentTypesField({
-  label,
-  description,
   value,
   disabled,
   suggestions,
   onChange,
 }: {
-  label: string;
-  description: string;
   value: unknown;
   disabled?: boolean;
   suggestions: string[];
   onChange: (value: unknown) => void;
 }) {
   const selected = useMemo(
-    () => (Array.isArray(value) ? value.map(String).filter(Boolean) : []),
+    () => sanitizeDocumentTypes(value) || [],
     [value],
   );
   const [draft, setDraft] = useState("");
 
   const commitValue = (next: string[]) => {
-    const unique = Array.from(new Set(next.map((item) => item.trim()).filter(Boolean)));
-    // Omit the key when empty so the trigger accepts all document types.
-    onChange(unique.length ? unique : undefined);
+    onChange(sanitizeDocumentTypes(next));
   };
 
   const addDraft = () => {
@@ -374,20 +376,14 @@ function DocumentTypesField({
     setDraft("");
   };
 
-  const available = suggestions.filter((item) => !selected.includes(item));
+  const available = suggestions.filter(
+    (item) =>
+      !selected.some((entry) => entry.toLowerCase() === item.toLowerCase()),
+  );
 
   return (
     <fieldset className="dynamic-checks document-types-field">
-      <legend>{label}</legend>
-      <p className="field-hint">
-        Se non selezioni tipi documento, il trigger considera tutti i tipi
-      </p>
-      {description &&
-      description !==
-        "Se non selezioni tipi documento, il trigger considera tutti i tipi" ? (
-        <p className="field-hint">{description}</p>
-      ) : null}
-
+      <legend>Tipi documento ammessi</legend>
       <div className="tag-list">
         {selected.length === 0 ? (
           <span className="tag-empty">Tutti i tipi documento</span>
@@ -423,7 +419,11 @@ function DocumentTypesField({
             }
           }}
         />
-        <button type="button" disabled={disabled || !draft.trim()} onClick={addDraft}>
+        <button
+          type="button"
+          disabled={disabled || !draft.trim()}
+          onClick={addDraft}
+        >
           Aggiungi
         </button>
       </div>
@@ -442,6 +442,11 @@ function DocumentTypesField({
           ))}
         </div>
       ) : null}
+
+      <p className="field-hint">
+        Se non selezioni alcun tipo, il trigger considera tutti i tipi
+        documento.
+      </p>
     </fieldset>
   );
 }

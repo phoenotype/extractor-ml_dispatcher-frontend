@@ -49,10 +49,11 @@ export function CreateFlowDialog({
         />
       </label>
       <label>
-        Tipo documento
+        Categoria descrittiva
         <input
           value={documentType}
           onChange={(event) => setDocumentType(event.target.value)}
+          placeholder="Non è un filtro operativo"
         />
       </label>
       <div className="modal-actions">

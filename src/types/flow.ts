@@ -64,25 +64,47 @@ export interface ValidationResult {
   issues?: ValidationIssue[];
 }
 
+export interface TraceCheck {
+  criterion: string;
+  expected?: unknown;
+  actual?: unknown;
+  matched: boolean;
+}
+
+export interface TraceStepDetails {
+  checks?: TraceCheck[];
+  failedCriteria?: string[];
+  reason?: string;
+  [key: string]: unknown;
+}
+
 export interface TraceStep {
   nodeId?: string;
   node?: string;
+  nodeType?: string;
   branch?: Branch;
-  result?: boolean;
+  status?: "executed" | "skipped" | string;
+  result?: boolean | string;
   conditionResult?: boolean;
+  details?: TraceStepDetails;
+  plannedMutations?: Array<Record<string, unknown>> | Record<string, unknown>;
   [key: string]: unknown;
 }
 
 export interface SimulationDocument {
   protocol?: number;
+  documentType?: string;
   trace?: TraceStep[];
-  plannedMutations?: Array<Record<string, unknown>>;
+  plannedMutations?: Array<Record<string, unknown>> | Record<string, unknown>;
   sourceExportStatus?: number;
   stopped?: boolean;
+  stopReason?: string;
   databaseWrites?: number;
 }
 
 export interface SimulationResult extends SimulationDocument {
+  flowName?: string;
+  simulation?: boolean;
   documents?: SimulationDocument[];
   count?: number;
 }

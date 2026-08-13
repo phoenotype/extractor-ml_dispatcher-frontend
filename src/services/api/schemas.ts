@@ -110,15 +110,24 @@ export const validationResultSchema = z.object({
 export const simulationDocumentSchema = z
   .object({
     protocol: z.number().optional(),
+    documentType: z.string().optional(),
     trace: z.array(z.record(z.string(), z.unknown())).optional(),
-    plannedMutations: z.array(z.record(z.string(), z.unknown())).optional(),
+    plannedMutations: z
+      .union([
+        z.array(z.record(z.string(), z.unknown())),
+        z.record(z.string(), z.unknown()),
+      ])
+      .optional(),
     sourceExportStatus: z.number().optional(),
     stopped: z.boolean().optional(),
+    stopReason: z.string().optional(),
     databaseWrites: z.number().optional(),
   })
   .passthrough();
 
 export const simulationResultSchema = simulationDocumentSchema.extend({
+  flowName: z.string().optional(),
+  simulation: z.boolean().optional(),
   documents: z.array(simulationDocumentSchema).optional(),
   count: z.number().optional(),
 });

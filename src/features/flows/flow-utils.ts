@@ -103,13 +103,9 @@ export function normalizeFlowDefinition(
         node.config && typeof node.config === "object"
           ? { ...(node.config as Record<string, unknown>) }
           : {};
-      // Empty documentTypes means "all types" — omit the key from JSON.
-      if (
-        Array.isArray(config.documentTypes) &&
-        config.documentTypes.length === 0
-      ) {
-        delete config.documentTypes;
-      }
+      const sanitized = sanitizeDocumentTypes(config.documentTypes);
+      if (sanitized) config.documentTypes = sanitized;
+      else delete config.documentTypes;
       return {
         id: node.id,
         type: node.type,
@@ -164,7 +160,10 @@ export function defaultFieldValue(
     return catalog.documentFields[0]?.path || "";
   }
   // Optional documentTypes: omit from config so the trigger accepts all types.
-  if (key === "documentTypes" || (field.type === "array" && field.items === "string" && !field.required)) {
+  if (key === "documentTypes") {
+    return undefined;
+  }
+  if (field.type === "array" && field.items === "string" && !field.required) {
     return undefined;
   }
   if (field.type === "enum") return field.values?.[0];
@@ -174,16 +173,97 @@ export function defaultFieldValue(
   return "";
 }
 
+/** Deduplica tipi documento (case-insensitive) e rimuove vuoti/spazi. */
+export function sanitizeDocumentTypes(value: unknown): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) return undefined;
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const trimmed = item.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+  return result.length ? result : undefined;
+}
+
+function formatSummaryList(values: string[], maxVisible = 2): string {
+  if (!values.length) return "—";
+  if (values.length <= maxVisible) return values.join(", ");
+  return `${values.slice(0, maxVisible).join(", ")} +${values.length - maxVisible}`;
+}
+
 export function formatTriggerSummary(config: Record<string, unknown>): string {
   const statuses = Array.isArray(config.exportStatuses)
     ? config.exportStatuses.map(String)
     : [];
-  const types = Array.isArray(config.documentTypes)
-    ? config.documentTypes.map(String).filter(Boolean)
-    : null;
-  const statusLine = `Stati: ${statuses.length ? statuses.join(", ") : "—"}`;
-  const typesLine = `Tipi: ${types && types.length ? types.join(", ") : "Tutti"}`;
+  const types = sanitizeDocumentTypes(config.documentTypes);
+  const statusLine = `Stati: ${statuses.length ? formatSummaryList(statuses) : "—"}`;
+  const typesLine = `Tipi: ${types?.length ? formatSummaryList(types) : "Tutti"}`;
   return `${statusLine}\n${typesLine}`;
+}
+
+/** Riepilogo criteri trigger per la barra flusso. */
+export function getFlowTriggerSummary(
+  flow: FlowDefinition,
+): { statusLine: string; typesLine: string } | null {
+  const trigger = flow.nodes.find((node) =>
+    node.type === "trigger.export_status" || node.type.startsWith("trigger."),
+  );
+  if (!trigger) return null;
+  const lines = formatTriggerSummary(trigger.config).split("\n");
+  return {
+    statusLine: lines[0] || "Stati: —",
+    typesLine: lines[1] || "Tipi: Tutti",
+  };
+}
+
+/**
+ * Garantisce che il configSchema del trigger esponga sempre documentTypes
+ * anche se il catalogo remoto è incompleto.
+ */
+export function ensureTriggerConfigSchema(
+  definition: CatalogNodeType,
+): CatalogNodeType {
+  if (definition.type !== "trigger.export_status") return definition;
+  const schema = { ...definition.configSchema };
+  if (!schema.exportStatuses) {
+    schema.exportStatuses = {
+      type: "array",
+      items: "number",
+      required: true,
+      source: "exportStatuses",
+      label: "Stati di esportazione",
+    };
+  } else {
+    schema.exportStatuses = {
+      ...schema.exportStatuses,
+      label: schema.exportStatuses.label || "Stati di esportazione",
+    };
+  }
+  if (!schema.documentTypes) {
+    schema.documentTypes = {
+      type: "array",
+      items: "string",
+      required: false,
+      label: "Tipi documento ammessi",
+      description:
+        "Se non selezioni alcun tipo, il trigger considera tutti i tipi documento.",
+    };
+  } else {
+    schema.documentTypes = {
+      ...schema.documentTypes,
+      label: "Tipi documento ammessi",
+      description:
+        schema.documentTypes.description ||
+        "Se non selezioni alcun tipo, il trigger considera tutti i tipi documento.",
+    };
+  }
+  return { ...definition, configSchema: schema };
 }
 
 export function toFlowNodes(
@@ -285,6 +365,29 @@ export function preliminaryValidate(
           nodeId: node.id,
           message: `${definition.label}: il campo ${field.label || key} è obbligatorio`,
         });
+      }
+
+      if (key === "documentTypes" && value !== undefined && value !== null) {
+        if (!Array.isArray(value)) {
+          issues.push({
+            nodeId: node.id,
+            message: `${definition.label}: documentTypes deve essere un array di stringhe`,
+          });
+        } else if (value.length === 0) {
+          issues.push({
+            nodeId: node.id,
+            message: `${definition.label}: documentTypes non può essere un array vuoto — ometti la proprietà per accettare tutti i tipi`,
+          });
+        } else if (
+          value.some(
+            (item) => typeof item !== "string" || !String(item).trim(),
+          )
+        ) {
+          issues.push({
+            nodeId: node.id,
+            message: `${definition.label}: ogni documentType deve essere una stringa non vuota`,
+          });
+        }
       }
     }
     const allowedOutputs = new Set(definition.outputs);

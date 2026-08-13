@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   defaultFieldValue,
   formatTriggerSummary,
+  getFlowTriggerSummary,
   preliminaryValidate,
+  sanitizeDocumentTypes,
   slug,
   toFlowEdges,
 } from "./flow-utils";
@@ -28,7 +30,6 @@ const catalog: Catalog = {
           type: "array",
           items: "string",
           required: false,
-          description: "Tipi documento ammessi; se omesso accetta tutti i tipi",
         },
       },
       outputs: ["always"],
@@ -96,7 +97,7 @@ describe("toFlowEdges", () => {
 });
 
 describe("formatTriggerSummary", () => {
-  it("mostra tipi selezionati o Tutti", () => {
+  it("mostra tipi selezionati o Tutti e tronca liste lunghe", () => {
     expect(
       formatTriggerSummary({
         exportStatuses: [4, 90],
@@ -106,6 +107,23 @@ describe("formatTriggerSummary", () => {
     expect(formatTriggerSummary({ exportStatuses: [4] })).toBe(
       "Stati: 4\nTipi: Tutti",
     );
+    expect(
+      formatTriggerSummary({
+        exportStatuses: [4],
+        documentTypes: ["Invoice", "Receipt", "DN", "POD", "Other"],
+      }),
+    ).toBe("Stati: 4\nTipi: Invoice, Receipt +3");
+  });
+});
+
+describe("sanitizeDocumentTypes", () => {
+  it("deduplica case-insensitive e omette array vuoti", () => {
+    expect(sanitizeDocumentTypes([" Invoice ", "invoice", "Receipt"])).toEqual([
+      "Invoice",
+      "Receipt",
+    ]);
+    expect(sanitizeDocumentTypes([])).toBeUndefined();
+    expect(sanitizeDocumentTypes(["  ", ""])).toBeUndefined();
   });
 });
 
@@ -113,6 +131,29 @@ describe("defaultFieldValue", () => {
   it("omite documentTypes opzionali", () => {
     const field = catalog.nodeTypes[0].configSchema.documentTypes;
     expect(defaultFieldValue(field, catalog, "documentTypes")).toBeUndefined();
+  });
+});
+
+describe("getFlowTriggerSummary", () => {
+  it("estrae i criteri dal nodo trigger", () => {
+    const flow: FlowDefinition = {
+      schemaVersion: 1,
+      flowName: "demo",
+      nodes: [
+        {
+          id: "t1",
+          type: "trigger.export_status",
+          name: "Trigger",
+          config: { exportStatuses: [4], documentTypes: ["Invoice"] },
+        },
+      ],
+      edges: [],
+      settings: { requiresExplicitOptIn: true },
+    };
+    expect(getFlowTriggerSummary(flow)).toEqual({
+      statusLine: "Stati: 4",
+      typesLine: "Tipi: Invoice",
+    });
   });
 });
 
@@ -142,5 +183,26 @@ describe("preliminaryValidate", () => {
     expect(issues.some((i) => i.nodeId === "t1")).toBe(true);
     expect(issues.some((i) => i.nodeId === "c1")).toBe(true);
     expect(issues.some((i) => i.message.includes("maybe"))).toBe(true);
+  });
+
+  it("rifiuta documentTypes come array vuoto", () => {
+    const flow: FlowDefinition = {
+      schemaVersion: 1,
+      flowName: "demo",
+      nodes: [
+        {
+          id: "t1",
+          type: "trigger.export_status",
+          name: "Trigger",
+          config: { exportStatuses: [4], documentTypes: [] },
+        },
+      ],
+      edges: [],
+      settings: { requiresExplicitOptIn: true },
+    };
+    const issues = preliminaryValidate(flow, catalog);
+    expect(
+      issues.some((i) => i.message.toLowerCase().includes("documenttypes")),
+    ).toBe(true);
   });
 });

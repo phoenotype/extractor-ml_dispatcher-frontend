@@ -21,14 +21,15 @@ export const mockCatalog: Catalog = {
           items: "number",
           required: true,
           source: "exportStatuses",
-          label: "Stati iniziali",
+          label: "Stati di esportazione",
         },
         documentTypes: {
           type: "array",
           items: "string",
           required: false,
-          description: "Tipi documento ammessi; se omesso accetta tutti i tipi",
-          label: "Tipi documento",
+          description:
+            "Se non selezioni alcun tipo, il trigger considera tutti i tipi documento.",
+          label: "Tipi documento ammessi",
         },
       },
       outputs: ["always"],
@@ -118,7 +119,7 @@ export const starterFlow: FlowDefinition = {
     {
       id: "invoice_in_validation",
       type: "trigger.export_status",
-      name: "Fattura in validazione",
+      name: "Invoice in validation queue",
       config: { exportStatuses: [4], documentTypes: ["Invoice"] },
       position: { x: 90, y: 175 },
     },
@@ -217,19 +218,69 @@ export const mockFlowDetails: Record<string, FlowDetail> = Object.fromEntries(
 );
 
 export const mockSimulation: SimulationResult = {
+  flowName: "invoice_opt_in_archive",
+  simulation: true,
   count: 1,
   documents: [
     {
-      protocol: 123,
+      protocol: 3141,
+      documentType: "passive_cycle",
       sourceExportStatus: 4,
-      stopped: false,
+      stopped: true,
+      stopReason:
+        "Il trigger non corrisponde: tipo documento non ammesso. Nessuna azione successiva eseguita.",
       databaseWrites: 0,
       trace: [
-        { nodeId: "invoice_in_validation", branch: "always" },
-        { nodeId: "explicitly_ready", branch: "true", conditionResult: true },
-        { nodeId: "send_to_archive" },
+        {
+          nodeId: "invoice_in_validation",
+          nodeType: "trigger.export_status",
+          status: "executed",
+          result: "false",
+          details: {
+            checks: [
+              {
+                criterion: "exportStatus",
+                expected: [4],
+                actual: 4,
+                matched: true,
+              },
+              {
+                criterion: "documentType",
+                expected: ["Invoice"],
+                actual: "passive_cycle",
+                matched: false,
+              },
+              {
+                criterion: "companyModuleEnabled",
+                expected: true,
+                actual: true,
+                matched: true,
+              },
+            ],
+            failedCriteria: ["documentType"],
+          },
+          plannedMutations: {},
+        },
+        {
+          nodeId: "explicitly_ready",
+          nodeType: "condition",
+          status: "skipped",
+          result: "not_reached",
+          details: {
+            reason: "Node not reached by the selected branch",
+          },
+        },
+        {
+          nodeId: "send_to_archive",
+          nodeType: "action.update_export_status",
+          status: "skipped",
+          result: "not_reached",
+          details: {
+            reason: "Node not reached by the selected branch",
+          },
+        },
       ],
-      plannedMutations: [{ field: "export_status", from: 4, to: 90 }],
+      plannedMutations: [],
     },
   ],
 };

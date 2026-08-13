@@ -29,6 +29,7 @@ interface BottomPanelProps {
   simulationIndex: number;
   onSimulationIndexChange: (index: number) => void;
   simulationLoading: boolean;
+  triggerSummary?: string | null;
   jsonDraft: string;
   jsonError: string | null;
   onJsonChange: (value: string) => void;
@@ -48,6 +49,7 @@ export function BottomPanel({
   simulationIndex,
   onSimulationIndexChange,
   simulationLoading,
+  triggerSummary = null,
   jsonDraft,
   jsonError,
   onJsonChange,
@@ -112,6 +114,7 @@ export function BottomPanel({
                 index={simulationIndex}
                 onIndexChange={onSimulationIndexChange}
                 loading={simulationLoading}
+                triggerSummary={triggerSummary}
               />
             ) : null}
             {tab === "json" ? (
