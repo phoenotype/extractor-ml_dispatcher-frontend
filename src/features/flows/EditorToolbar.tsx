@@ -23,7 +23,6 @@ interface EditorToolbarProps {
   canRun: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  categoryLabel?: string;
   triggerStatusLine?: string | null;
   triggerTypesLine?: string | null;
   onBack: () => void;
@@ -34,7 +33,6 @@ interface EditorToolbarProps {
   onSimulate: () => void;
   onSave: () => void;
   onRun: () => void;
-  onCategoryChange?: (value: string) => void;
 }
 
 export function EditorToolbar({
@@ -49,7 +47,6 @@ export function EditorToolbar({
   canRun,
   canUndo,
   canRedo,
-  categoryLabel = "",
   triggerStatusLine,
   triggerTypesLine,
   onBack,
@@ -60,7 +57,6 @@ export function EditorToolbar({
   onSimulate,
   onSave,
   onRun,
-  onCategoryChange,
 }: EditorToolbarProps) {
   const { theme, toggleTheme } = useThemeContext();
 
@@ -143,20 +139,10 @@ export function EditorToolbar({
       {!legacy ? (
         <div className="flow-criteria-bar">
           <div className="criteria-block">
-            <small>Filtro operativo del trigger</small>
+            <small>Filtri dal JSON del nodo trigger</small>
             <b>{triggerStatusLine || "Stati: —"}</b>
             <b>{triggerTypesLine || "Tipi: Tutti"}</b>
           </div>
-          <label className="criteria-category">
-            <small>Categoria descrittiva</small>
-            <input
-              value={categoryLabel}
-              disabled={!canEdit}
-              placeholder="Solo classificazione del flusso"
-              onChange={(event) => onCategoryChange?.(event.target.value)}
-              title="Non influenza il motore: i filtri operativi sono nel nodo trigger"
-            />
-          </label>
         </div>
       ) : null}
     </header>

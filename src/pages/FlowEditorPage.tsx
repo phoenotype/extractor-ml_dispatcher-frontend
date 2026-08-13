@@ -213,16 +213,28 @@ export function FlowEditorPage() {
           `dispatcher-draft:${remote.flowName}`,
         );
         const draft = draftRaw
-          ? (JSON.parse(draftRaw) as { flow?: FlowDefinition })
+          ? (JSON.parse(draftRaw) as {
+              flow?: FlowDefinition;
+              remoteUpdatedAt?: string;
+            })
           : null;
+        const remoteUpdatedAt =
+          remote.expectedUpdatedAt || remote.updatedAt || "";
+        const draftMatchesRemote =
+          Boolean(draft?.flow) &&
+          Boolean(draft?.remoteUpdatedAt) &&
+          draft?.remoteUpdatedAt === remoteUpdatedAt;
+        if (draftRaw && !draftMatchesRemote) {
+          localStorage.removeItem(`dispatcher-draft:${remote.flowName}`);
+        }
         const next = normalizeFlowDefinition(
-          draft?.flow || definition,
+          draftMatchesRemote && draft?.flow ? draft.flow : definition,
           remote.flowName,
         );
         setLegacy(false);
         setLegacyPayload(null);
         setFlow(next);
-        setDirty(Boolean(draft?.flow));
+        setDirty(draftMatchesRemote);
         setSelectedId(next.nodes[0]?.id || null);
         syncGraph(next);
       }
@@ -249,12 +261,13 @@ export function FlowEditorPage() {
         JSON.stringify({
           flow,
           isActive,
+          remoteUpdatedAt: expectedUpdatedAt,
           savedAt: new Date().toISOString(),
         }),
       );
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [dirty, flow, isActive, legacy]);
+  }, [dirty, expectedUpdatedAt, flow, isActive, legacy]);
 
   useEffect(() => {
     if (!catalog || !activeSimulation) return;
@@ -452,6 +465,12 @@ export function FlowEditorPage() {
   };
 
   const doSimulate = async () => {
+    if (dirty) {
+      setNotice(
+        "Salva prima il JSON: la simulazione usa sempre il flusso salvato nel database.",
+      );
+      return;
+    }
     setShowSimModal(false);
     setBusy("simulate");
     setBottomOpen(true);
@@ -663,11 +682,10 @@ export function FlowEditorPage() {
         busy={busy}
         canEdit={canEdit}
         canValidate={canValidate(role)}
-        canSimulate={canSimulate(role)}
+        canSimulate={canSimulate(role) && !dirty}
         canRun={runEnabled}
         canUndo={history.current.length > 0}
         canRedo={future.current.length > 0}
-        categoryLabel={documentType}
         triggerStatusLine={triggerCriteria?.statusLine}
         triggerTypesLine={triggerCriteria?.typesLine}
         onBack={() => void goBack()}
@@ -682,7 +700,6 @@ export function FlowEditorPage() {
         onSimulate={() => setShowSimModal(true)}
         onSave={() => void save()}
         onRun={() => setShowRunModal(true)}
-        onCategoryChange={setDocumentType}
       />
 
       {legacy ? (
