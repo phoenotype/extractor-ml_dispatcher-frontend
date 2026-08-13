@@ -121,7 +121,7 @@ function DynamicNodeForm({
       </label>
       {Object.entries(definition.configSchema).map(([key, field]) => (
         <DynamicConfigField
-          key={key}
+          key={`${node.id}:${key}`}
           fieldKey={key}
           field={field}
           value={node.config[key]}
@@ -405,6 +405,17 @@ function DynamicConfigField({
     );
   }
 
+  if (field.type === "any" && (fieldKey === "headers" || fieldKey === "body")) {
+    return (
+      <JsonConfigField
+        label={label}
+        value={value}
+        disabled={disabled}
+        onChange={onChange}
+      />
+    );
+  }
+
   return (
     <label>
       {label}
@@ -416,6 +427,54 @@ function DynamicConfigField({
           onChange(parseCatalogValue(event.target.value, field))
         }
       />
+    </label>
+  );
+}
+
+function JsonConfigField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: unknown;
+  disabled?: boolean;
+  onChange: (value: unknown) => void;
+}) {
+  const [draft, setDraft] = useState(() =>
+    value === undefined ? "" : JSON.stringify(value, null, 2),
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <label>
+      {label} (JSON)
+      <textarea
+        disabled={disabled}
+        rows={7}
+        value={draft}
+        placeholder={label.toLowerCase() === "headers" ? '{\n  "X-Source": "dispatcher"\n}' : '{\n  "protocol": "{{ document.protocol }}"\n}'}
+        onChange={(event) => {
+          const next = event.target.value;
+          setDraft(next);
+          if (!next.trim()) {
+            setError(null);
+            onChange(undefined);
+            return;
+          }
+          try {
+            onChange(JSON.parse(next));
+            setError(null);
+          } catch {
+            setError("JSON non valido");
+          }
+        }}
+      />
+      {error ? <small className="field-error">{error}</small> : null}
+      <small className="field-hint">
+        Puoi usare template come {"{{ document.protocol }}"}.
+      </small>
     </label>
   );
 }
