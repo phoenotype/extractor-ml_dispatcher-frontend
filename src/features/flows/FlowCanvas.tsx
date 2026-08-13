@@ -55,8 +55,12 @@ function FlowCanvasInner({
       onEdgesChange={onEdgesChange}
       onConnect={onConnect}
       onNodeClick={(_, node) => onSelect(node.id)}
+      onPaneClick={() => onSelect(null)}
       onSelectionChange={(params: OnSelectionChangeParams) => {
-        onSelect(params.nodes[0]?.id ?? null);
+        // Ignore empty selections: React Flow often emits them when node data
+        // is refreshed (e.g. typing in the config panel), which would close the panel.
+        const id = params.nodes[0]?.id;
+        if (id) onSelect(id);
       }}
       fitView
       nodesDraggable={!readOnly}

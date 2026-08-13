@@ -126,9 +126,11 @@ export function FlowEditorPage() {
         tracedNodes?: Set<string>;
         dimmedNodes?: Set<string>;
         tracedEdges?: Set<string>;
+        selectedId?: string | null;
       },
     ) => {
       if (!catalog) return;
+      const selected = options?.selectedId;
       setNodes(
         toFlowNodes(
           next,
@@ -136,7 +138,10 @@ export function FlowEditorPage() {
           options?.tracedNodes,
           options?.issues,
           options?.dimmedNodes,
-        ),
+        ).map((node) => ({
+          ...node,
+          selected: selected ? node.id === selected : Boolean(node.selected),
+        })),
       );
       setEdges(
         toFlowEdges(next, options?.tracedEdges, {
@@ -155,12 +160,12 @@ export function FlowEditorPage() {
         future.current = [];
       }
       setFlow(next);
-      syncGraph(next);
+      syncGraph(next, { selectedId });
       setDirty(true);
       setValidation(null);
       setRecentSimulationAt(null);
     },
-    [flow, syncGraph],
+    [flow, selectedId, syncGraph],
   );
 
   const loadFlow = useCallback(async () => {
@@ -275,6 +280,7 @@ export function FlowEditorPage() {
       tracedNodes: highlight.tracedNodes,
       dimmedNodes: highlight.dimmedNodes,
       tracedEdges: highlight.tracedEdges,
+      selectedId,
     });
   }, [
     activeSimulation,
@@ -283,6 +289,7 @@ export function FlowEditorPage() {
     highlight.dimmedNodes,
     highlight.tracedEdges,
     highlight.tracedNodes,
+    selectedId,
     syncGraph,
   ]);
 
