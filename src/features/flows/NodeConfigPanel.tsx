@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 import { Copy, Pause, Settings2, Trash2, X } from "lucide-react";
 import {
+  findDocumentField,
+  operatorsForDocumentField,
+} from "@/features/flows/catalog-fields";
+import { FieldPathPicker } from "@/features/flows/FieldPathPicker";
+import {
   catalogNode,
   ensureTriggerConfigSchema,
   nodeVisual,
@@ -124,6 +129,7 @@ function DynamicNodeForm({
           catalog={catalog}
           disabled={disabled}
           onChange={(value) => onUpdate({}, { [key]: value })}
+          onConfigPatch={(patch) => onUpdate({}, patch)}
         />
       ))}
       {definition.outputs.length === 0 ? (
@@ -185,6 +191,7 @@ function DynamicConfigField({
   catalog,
   disabled,
   onChange,
+  onConfigPatch,
 }: {
   fieldKey: string;
   field: CatalogConfigField;
@@ -193,26 +200,50 @@ function DynamicConfigField({
   catalog: Catalog;
   disabled?: boolean;
   onChange: (value: unknown) => void;
+  onConfigPatch: (patch: Record<string, unknown>) => void;
 }) {
   if (field.requiredExceptFor?.includes(String(config.operator))) return null;
 
   if (field.source === "documentFields") {
+    const operatorValues = catalog.nodeTypes
+      .find((item) => item.type === "condition")
+      ?.configSchema.operator?.values;
+
     return (
-      <label>
-        {field.label || fieldKey}
-        <select
-          disabled={disabled}
-          value={String(value ?? "")}
-          onChange={(event) => onChange(event.target.value)}
-        >
-          <option value="">Seleziona un campo…</option>
-          {catalog.documentFields.map((item) => (
-            <option key={item.path} value={item.path}>
-              {item.label} · {item.path}
-            </option>
-          ))}
-        </select>
-      </label>
+      <FieldPathPicker
+        label={field.label || "Campo"}
+        value={value}
+        fields={catalog.documentFields}
+        disabled={disabled}
+        onChange={(path) => {
+          const docField = findDocumentField(catalog.documentFields, path);
+          const allowed = operatorsForDocumentField(
+            docField,
+            operatorValues || [
+              "eq",
+              "ne",
+              "in",
+              "not_in",
+              "exists",
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+            ],
+          );
+          const patch: Record<string, unknown> = { field: path };
+          if (docField?.dataType === "array") {
+            patch.operator = allowed[0] || "exists";
+            patch.value = undefined;
+          } else if (
+            allowed.length > 0 &&
+            !allowed.includes(String(config.operator ?? ""))
+          ) {
+            patch.operator = allowed[0];
+          }
+          onConfigPatch(patch);
+        }}
+      />
     );
   }
 
@@ -295,6 +326,47 @@ function DynamicConfigField({
   const label =
     field.label ||
     fieldKey.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase());
+
+  if (field.type === "enum" && fieldKey === "operator") {
+    const docField = findDocumentField(
+      catalog.documentFields,
+      String(config.field ?? ""),
+    );
+    const options = operatorsForDocumentField(docField, field.values || []);
+    return (
+      <label>
+        {label}
+        <select
+          disabled={disabled}
+          value={
+            options.includes(String(value ?? ""))
+              ? String(value ?? "")
+              : options[0] || ""
+          }
+          onChange={(event) => {
+            const next = parseCatalogValue(event.target.value, field);
+            if (next === "exists") {
+              onConfigPatch({ operator: next, value: undefined });
+            } else {
+              onChange(next);
+            }
+          }}
+        >
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        {docField?.dataType === "array" ? (
+          <small className="field-hint">
+            Per le collezioni è disponibile solo la verifica di presenza del
+            percorso (`exists`).
+          </small>
+        ) : null}
+      </label>
+    );
+  }
 
   if (field.type === "enum") {
     return (

@@ -1,0 +1,15 @@
+---
+description: Always pull, commit, and push completed work on main
+alwaysApply: true
+---
+
+# Git workflow for this repo
+
+After finishing a coherent set of code changes in this project:
+
+1. `git fetch` / `git pull --ff-only` on `main` (merge only if fast-forward is not possible and the user expects it).
+2. Create a commit with a clear message (why over what).
+3. `git push` to `origin/main` (or the active tracking branch).
+4. Do not leave finished feature work uncommitted unless the user explicitly asks to wait.
+
+Do not force-push to main. Do not skip hooks. Prefer the Python/WSL commit helper when PowerShell breaks heredocs.

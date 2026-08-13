@@ -30,6 +30,10 @@ export interface CatalogDocumentField {
   path: string;
   label: string;
   dataType: "string" | "number" | "boolean" | "array";
+  /** Raggruppamento opzionale dal catalogo (es. batch_fields). */
+  group?: string;
+  section?: string;
+  description?: string;
 }
 
 export interface CatalogExportStatus {

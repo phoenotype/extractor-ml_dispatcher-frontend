@@ -160,11 +160,16 @@ export const catalogSchema = z.object({
   schemaVersion: z.number(),
   nodeTypes: z.array(catalogNodeTypeSchema),
   documentFields: z.array(
-    z.object({
-      path: z.string(),
-      label: z.string(),
-      dataType: z.enum(["string", "number", "boolean", "array"]),
-    }),
+    z
+      .object({
+        path: z.string(),
+        label: z.string(),
+        dataType: z.enum(["string", "number", "boolean", "array"]),
+        group: z.string().optional(),
+        section: z.string().optional(),
+        description: z.string().optional(),
+      })
+      .passthrough(),
   ),
   exportStatuses: z.array(
     z.object({
