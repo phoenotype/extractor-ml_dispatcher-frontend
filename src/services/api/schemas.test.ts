@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   flowListItemSchema,
   flowListPayloadSchema,
+  simulationResultSchema,
 } from "@/services/api/schemas";
 import { normalizeFlowList } from "@/services/api/dispatcher";
 
@@ -55,5 +56,50 @@ describe("flow list schemas", () => {
       updatedAt: "2026-08-12T00:00:00Z",
     });
     expect(item.expectedUpdatedAt).toBe("2026-08-12T00:00:00Z");
+  });
+});
+
+describe("simulation result schema", () => {
+  it("accetta una simulazione fermata dal trigger senza mutazioni", () => {
+    const parsed = simulationResultSchema.parse({
+      flowName: "invoice_opt_in_archive",
+      simulation: true,
+      documents: [
+        {
+          protocol: 3141,
+          sourceExportStatus: 4,
+          trace: [
+            {
+              nodeId: "invoice_in_validation",
+              nodeType: "trigger.export_status",
+              status: "executed",
+              result: "false",
+              details: {
+                checks: [
+                  {
+                    criterion: "documentType",
+                    expected: ["Invoice"],
+                    actual: "passive_cycle",
+                    matched: false,
+                  },
+                ],
+                failedCriteria: ["documentType"],
+              },
+              plannedMutations: {},
+            },
+          ],
+          plannedMutations: {},
+          stopped: true,
+        },
+      ],
+      count: 1,
+      databaseWrites: 0,
+      requestedProtocol: 3141,
+      status: "evaluated",
+    });
+
+    expect(parsed.documents).toHaveLength(1);
+    expect(parsed.documents?.[0].plannedMutations).toEqual({});
+    expect(parsed.documents?.[0].stopped).toBe(true);
   });
 });
