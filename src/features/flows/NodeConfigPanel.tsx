@@ -411,6 +411,7 @@ function DynamicConfigField({
         label={label}
         value={value}
         disabled={disabled}
+        requireObject={fieldKey === "headers"}
         onChange={onChange}
       />
     );
@@ -435,11 +436,13 @@ function JsonConfigField({
   label,
   value,
   disabled,
+  requireObject,
   onChange,
 }: {
   label: string;
   value: unknown;
   disabled?: boolean;
+  requireObject?: boolean;
   onChange: (value: unknown) => void;
 }) {
   const [draft, setDraft] = useState(() =>
@@ -464,7 +467,15 @@ function JsonConfigField({
             return;
           }
           try {
-            onChange(JSON.parse(next));
+            const parsed = JSON.parse(next);
+            if (
+              requireObject &&
+              (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+            ) {
+              setError("Inserisci un oggetto JSON");
+              return;
+            }
+            onChange(parsed);
             setError(null);
           } catch {
             setError("JSON non valido");

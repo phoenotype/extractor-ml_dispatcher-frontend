@@ -163,6 +163,9 @@ export function defaultFieldValue(
   if (key === "documentTypes") {
     return undefined;
   }
+  if (!field.required) {
+    return undefined;
+  }
   if (field.type === "array" && field.items === "string" && !field.required) {
     return undefined;
   }

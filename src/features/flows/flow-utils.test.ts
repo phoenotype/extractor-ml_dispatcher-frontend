@@ -132,6 +132,15 @@ describe("defaultFieldValue", () => {
     const field = catalog.nodeTypes[0].configSchema.documentTypes;
     expect(defaultFieldValue(field, catalog, "documentTypes")).toBeUndefined();
   });
+
+  it("non inserisce valori fittizi nei campi opzionali HTTP", () => {
+    expect(
+      defaultFieldValue({ type: "number", required: false }, catalog, "timeoutSeconds"),
+    ).toBeUndefined();
+    expect(
+      defaultFieldValue({ type: "any", required: false }, catalog, "headers"),
+    ).toBeUndefined();
+  });
 });
 
 describe("getFlowTriggerSummary", () => {
