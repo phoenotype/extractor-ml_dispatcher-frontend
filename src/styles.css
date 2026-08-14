@@ -933,6 +933,65 @@ button {
   color: #6c6c6c;
   line-height: 1.4;
 }
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.connection-manage-link,
+.editor-connections-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+.connection-manage-link {
+  font-size: 10px;
+  text-transform: none;
+}
+.connection-manage-link:hover,
+.editor-connections-link:hover {
+  text-decoration: underline;
+}
+.connection-empty-callout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  border: 1px solid rgba(36, 112, 121, 0.22);
+  border-radius: 8px;
+  background: rgba(36, 112, 121, 0.06);
+  color: var(--primary);
+  text-transform: none;
+}
+.connection-empty-callout > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.connection-empty-callout b {
+  font-size: 11px;
+}
+.connection-empty-callout small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+.connection-empty-callout > a {
+  grid-column: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  color: var(--primary);
+  font-size: 10px;
+  font-weight: 700;
+  text-decoration: underline;
+}
 .field-error {
   margin: 0 0 8px;
   font-size: 11px;
@@ -1996,7 +2055,7 @@ html[data-theme="dark"] .field-path-selected {
   }
   .editor-title small,
   .editor-title > span,
-  .editor-actions button:not(.primary) {
+.editor-actions button:not(.primary) {
     display: none;
   }
   .editor-title input {
@@ -2037,6 +2096,19 @@ html[data-theme="dark"] .field-path-selected {
   .canvas-toolbar button span {
     display: none;
   }
+}
+.editor-connections-link {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 13px;
+}
+.editor-connections-link:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
 }
 
 

@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  ExternalLink,
   Moon,
   Play,
   Redo2,
@@ -8,6 +9,7 @@ import {
   Sun,
   Undo2,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/Button";
 import { useThemeContext } from "@/components/theme/ThemeProvider";
 
@@ -84,6 +86,15 @@ export function EditorToolbar({
           {legacy ? <strong>Legacy — sola lettura</strong> : null}
         </div>
         <div className="editor-actions">
+          <Link
+            className="editor-connections-link"
+            to="/connections"
+            target="_blank"
+            rel="noreferrer"
+            title="Configura connessioni HTTP"
+          >
+            Connessioni <ExternalLink size={14} />
+          </Link>
           <button
             type="button"
             className="icon-button"

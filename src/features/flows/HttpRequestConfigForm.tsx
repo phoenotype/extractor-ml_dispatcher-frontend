@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AlertCircle, ExternalLink } from "lucide-react";
 import {
   isRelativeHttpPath,
   looksLikeAbsoluteUrl,
@@ -57,7 +58,17 @@ export function HttpRequestConfigForm({
   return (
     <div className="http-request-config">
       <label>
-        Connessione
+        <span className="field-label-row">
+          <span>Connessione</span>
+          <Link
+            className="connection-manage-link"
+            to="/connections"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Gestisci connessioni <ExternalLink size={12} />
+          </Link>
+        </span>
         <select
           disabled={disabled || connectionsQuery.isLoading}
           value={String(config.connectionRef ?? "")}
@@ -88,9 +99,21 @@ export function HttpRequestConfigForm({
           ))}
         </select>
         <small className="field-hint">
-          Solo riferimenti da{" "}
-          <Link to="/connections">Connessioni HTTP</Link>. Non inserire URL.
+          Seleziona una connessione autorizzata. Gli URL e i segreti si
+          configurano nella pagina Connessioni HTTP.
         </small>
+        {!connectionsQuery.isLoading && connections.length === 0 ? (
+          <span className="connection-empty-callout" role="status">
+            <AlertCircle size={16} />
+            <span>
+              <b>Nessuna connessione configurata.</b>
+              <small>Creane una prima di salvare questo nodo.</small>
+            </span>
+            <Link to="/connections" target="_blank" rel="noreferrer">
+              Configura ora <ExternalLink size={12} />
+            </Link>
+          </span>
+        ) : null}
         {selected && !selected.isActive ? (
           <small className="field-error">
             La connessione selezionata non è attiva.
@@ -106,7 +129,7 @@ export function HttpRequestConfigForm({
       <label>
         Metodo
         <select
-          disabled={disabled || !selected}
+          disabled={disabled}
           value={String(config.method ?? allowedMethods[0] ?? "POST")}
           onChange={(event) => patchConfig({ method: event.target.value })}
         >
