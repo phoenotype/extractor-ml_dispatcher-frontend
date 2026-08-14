@@ -1,31 +1,40 @@
 import http from "node:http";
+import { readFile, stat } from "node:fs/promises";
+import path from "node:path";
 import { URL } from "node:url";
 
 /**
  * Backend-for-frontend for Extractor ML Dispatcher.
  *
- * Browser → Lucy session headers → BFF → Google ID token → private Cloud Run
+ * Browser → Lucy session headers → BFF → upstream auth adapter → dispatcher
  *
  * Never accept Google ID tokens, API keys, or static cloud credentials from the browser.
+ *
+ * DISPATCHER_AUTH_MODE:
+ * - google_id_token (default): Cloud Run IAM via ADC / metadata / GOOGLE_ID_TOKEN
+ * - bearer: server-only DISPATCHER_BEARER_TOKEN
+ * - none: no Authorization header
  */
 
-const BFF_PORT = Number(process.env.BFF_PORT || 8787);
-const DISPATCHER_API_URL = (
-  process.env.DISPATCHER_API_URL ||
-  "https://extractor-ml-dispatcher-727480764999.europe-west1.run.app"
-).replace(/\/$/, "");
+const BFF_PORT = Number(process.env.PORT || process.env.BFF_PORT || 8787);
+const STATIC_DIR = path.resolve(process.env.STATIC_DIR || "dist");
+const DISPATCHER_API_URL = (process.env.DISPATCHER_API_URL || "")
+  .trim()
+  .replace(/\/$/, "");
 const DISPATCHER_AUDIENCE = (
   process.env.DISPATCHER_AUDIENCE ||
   DISPATCHER_API_URL
-).replace(/\/$/, "");
-const EXTRACTOR_ML_API_URL = (
-  process.env.EXTRACTOR_ML_API_URL ||
-  "https://extractor-ml-727480764999.europe-west1.run.app"
-).replace(/\/$/, "");
+)
+  .trim()
+  .replace(/\/$/, "");
+const EXTRACTOR_ML_API_URL = (process.env.EXTRACTOR_ML_API_URL || "")
+  .trim()
+  .replace(/\/$/, "");
 const VITE_ORIGIN = process.env.VITE_ORIGIN || "http://localhost:5173";
 const PROXY_PREFIX = "/api/dispatcher";
 const SKIP_LUCY_AUTH = process.env.BFF_SKIP_LUCY_AUTH === "true";
 const DEFAULT_ROLE = normalizeRole(process.env.BFF_DEFAULT_ROLE) || "viewer";
+const DISPATCHER_AUTH_MODE = normalizeAuthMode(process.env.DISPATCHER_AUTH_MODE);
 
 /** @type {{ token: string, expiresAt: number } | null} */
 let cachedIdToken = null;
@@ -33,6 +42,97 @@ let cachedIdToken = null;
 let googleAuth = null;
 
 const ROLE_RANK = { viewer: 1, editor: 2, operator: 3 };
+
+const MIME_TYPES = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
+
+function normalizeAuthMode(value) {
+  const mode = String(value || "google_id_token").trim().toLowerCase();
+  if (mode === "bearer" || mode === "none" || mode === "google_id_token") {
+    return mode;
+  }
+  console.warn(
+    `[bff] unknown DISPATCHER_AUTH_MODE="${value}", falling back to google_id_token`,
+  );
+  return "google_id_token";
+}
+
+function assertBffConfig() {
+  const errors = [];
+  if (!DISPATCHER_API_URL) {
+    errors.push("DISPATCHER_API_URL is required (no hardcoded Cloud Run fallback)");
+  }
+  if (!SKIP_LUCY_AUTH && !EXTRACTOR_ML_API_URL) {
+    errors.push("EXTRACTOR_ML_API_URL is required unless BFF_SKIP_LUCY_AUTH=true");
+  }
+  if (DISPATCHER_AUTH_MODE === "google_id_token" && !DISPATCHER_AUDIENCE) {
+    errors.push("DISPATCHER_AUDIENCE is required for google_id_token mode");
+  }
+  if (
+    DISPATCHER_AUTH_MODE === "bearer" &&
+    !process.env.DISPATCHER_BEARER_TOKEN?.trim()
+  ) {
+    errors.push("DISPATCHER_BEARER_TOKEN is required for bearer mode");
+  }
+  if (errors.length) {
+    for (const message of errors) console.error(`[bff] config: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function serveFrontend(req, res, pathname) {
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(pathname);
+  } catch {
+    sendJson(res, 400, { detail: "Percorso non valido" });
+    return;
+  }
+
+  const requested = decodedPath === "/" ? "index.html" : decodedPath.slice(1);
+  let filePath = path.resolve(STATIC_DIR, requested);
+  if (!filePath.startsWith(`${STATIC_DIR}${path.sep}`) && filePath !== STATIC_DIR) {
+    sendJson(res, 403, { detail: "Percorso non consentito" });
+    return;
+  }
+
+  try {
+    const fileStat = await stat(filePath);
+    if (!fileStat.isFile()) throw new Error("not a file");
+  } catch {
+    if (path.extname(requested)) {
+      sendJson(res, 404, { detail: "Not found" });
+      return;
+    }
+    filePath = path.join(STATIC_DIR, "index.html");
+  }
+
+  try {
+    const body = await readFile(filePath);
+    const extension = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      "Content-Type": MIME_TYPES[extension] || "application/octet-stream",
+      "Content-Length": String(body.byteLength),
+      "Cache-Control":
+        extension === ".html" ? "no-cache" : "public, max-age=31536000, immutable",
+    });
+    if (req.method === "HEAD") res.end();
+    else res.end(body);
+  } catch {
+    sendJson(res, 503, { detail: "Frontend non disponibile" });
+  }
+}
+
 
 function normalizeRole(value) {
   if (value === "viewer" || value === "editor" || value === "operator") {
@@ -312,6 +412,20 @@ async function getGoogleIdToken() {
   return token;
 }
 
+/**
+ * Upstream auth adapter — cloud-provider specifics stay behind this boundary.
+ * @returns {Promise<string | null>} raw bearer token, or null when mode=none
+ */
+async function resolveUpstreamAccessToken() {
+  if (DISPATCHER_AUTH_MODE === "none") return null;
+  if (DISPATCHER_AUTH_MODE === "bearer") {
+    const token = process.env.DISPATCHER_BEARER_TOKEN?.trim();
+    if (!token) throw new Error("DISPATCHER_BEARER_TOKEN mancante");
+    return token;
+  }
+  return getGoogleIdToken();
+}
+
 async function proxyToDispatcher(req, res, targetPath, origin, role) {
   if (!DISPATCHER_API_URL) {
     sendJson(
@@ -323,19 +437,21 @@ async function proxyToDispatcher(req, res, targetPath, origin, role) {
     return;
   }
 
-  let idToken;
+  let accessToken;
   try {
-    idToken = await getGoogleIdToken();
+    accessToken = await resolveUpstreamAccessToken();
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "ID token non disponibile";
-    console.error(`[bff] google id token error: ${message}`);
+      error instanceof Error ? error.message : "Upstream auth non disponibile";
+    console.error(`[bff] upstream auth error: ${message}`);
     sendJson(
       res,
       503,
       {
         detail:
-          "Impossibile ottenere un Google ID token per Cloud Run. Configura ADC, metadata server o GOOGLE_ID_TOKEN (solo server).",
+          DISPATCHER_AUTH_MODE === "google_id_token"
+            ? "Impossibile ottenere un Google ID token. Configura ADC, metadata server o GOOGLE_ID_TOKEN (solo server)."
+            : `Autenticazione upstream non disponibile (mode=${DISPATCHER_AUTH_MODE}).`,
       },
       origin,
     );
@@ -351,12 +467,14 @@ async function proxyToDispatcher(req, res, targetPath, origin, role) {
     upstreamUrl.search = incoming.search;
   }
 
-  // Only BFF-owned auth toward Cloud Run. Never forward browser Authorization / API keys.
+  // Only BFF-owned auth toward upstream. Never forward browser Authorization / API keys.
   const headers = {
     Accept: req.headers.accept || "application/json",
     "Content-Type": req.headers["content-type"] || "application/json",
-    Authorization: `Bearer ${idToken}`,
   };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
 
   const method = req.method || "GET";
   const hasBody = method !== "GET" && method !== "HEAD";
@@ -386,7 +504,7 @@ async function proxyToDispatcher(req, res, targetPath, origin, role) {
   responseHeaders["Content-Length"] = String(buffer.byteLength);
 
   console.info(
-    `[bff] ${method} ${PROXY_PREFIX}${targetPath === "/" ? "" : targetPath} role=${role} -> ${upstream.status}`,
+    `[bff] ${method} ${PROXY_PREFIX}${targetPath === "/" ? "" : targetPath} role=${role} auth=${DISPATCHER_AUTH_MODE} -> ${upstream.status}`,
   );
 
   res.writeHead(upstream.status, responseHeaders);
@@ -407,21 +525,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (requestUrl.pathname === "/healthz") {
+  if (
+    requestUrl.pathname === "/healthz" ||
+    requestUrl.pathname === "/api/healthz"
+  ) {
     sendJson(
       res,
       200,
       {
         status: "ok",
         dispatcherConfigured: Boolean(DISPATCHER_API_URL),
-        audience: DISPATCHER_AUDIENCE,
+        audience: DISPATCHER_AUDIENCE || null,
         lucyAuth: SKIP_LUCY_AUTH ? "skipped" : "required",
-        idTokenMode: process.env.GOOGLE_ID_TOKEN
-          ? "env"
-          : "adc-or-metadata",
+        authMode: DISPATCHER_AUTH_MODE,
+        idTokenMode:
+          DISPATCHER_AUTH_MODE === "google_id_token"
+            ? process.env.GOOGLE_ID_TOKEN
+              ? "env"
+              : "adc-or-metadata"
+            : DISPATCHER_AUTH_MODE,
+        staticDir: STATIC_DIR,
       },
       origin,
     );
+    return;
+  }
+
+  if (!requestUrl.pathname.startsWith(PROXY_PREFIX)) {
+    if (method !== "GET" && method !== "HEAD") {
+      sendJson(res, 405, { detail: "Method not allowed" }, origin);
+      return;
+    }
+    await serveFrontend(req, res, requestUrl.pathname);
     return;
   }
 
@@ -457,13 +592,18 @@ const server = http.createServer(async (req, res) => {
   await proxyToDispatcher(req, res, rewritten, origin, session.role);
 });
 
-server.listen(BFF_PORT, () => {
-  console.info(`[bff] listening on http://localhost:${BFF_PORT}`);
+assertBffConfig();
+
+server.listen(BFF_PORT, "0.0.0.0", () => {
+  console.info(`[bff] listening on http://0.0.0.0:${BFF_PORT}`);
   console.info(`[bff] proxy ${PROXY_PREFIX}/* -> ${DISPATCHER_API_URL}`);
-  console.info(`[bff] audience: ${DISPATCHER_AUDIENCE}`);
-  console.info(`[bff] lucy auth: ${EXTRACTOR_ML_API_URL}/auth/me`);
-  console.info(`[bff] CORS origin: ${VITE_ORIGIN}`);
-  console.info(
-    `[bff] id token: ${process.env.GOOGLE_ID_TOKEN ? "GOOGLE_ID_TOKEN env" : "ADC/metadata"}`,
-  );
+  console.info(`[bff] auth mode: ${DISPATCHER_AUTH_MODE}`);
+  if (DISPATCHER_AUTH_MODE === "google_id_token") {
+    console.info(`[bff] audience: ${DISPATCHER_AUDIENCE}`);
+    console.info(
+      `[bff] id token: ${process.env.GOOGLE_ID_TOKEN ? "GOOGLE_ID_TOKEN env" : "ADC/metadata"}`,
+    );
+  }
+  console.info(`[bff] lucy auth: ${SKIP_LUCY_AUTH ? "skipped" : EXTRACTOR_ML_API_URL + "/auth/me"}`);
+  console.info(`[bff] static: ${STATIC_DIR}`);
 });

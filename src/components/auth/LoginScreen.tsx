@@ -8,8 +8,7 @@ import {
 } from "@/lib/lucy-auth";
 
 const EXTRACTOR_ML_API_URL = (
-  import.meta.env.VITE_EXTRACTOR_ML_API_URL ||
-  "https://extractor-ml-727480764999.europe-west1.run.app"
+  import.meta.env.VITE_EXTRACTOR_ML_API_URL || ""
 ).replace(/\/$/, "");
 
 interface LoginScreenProps {
@@ -20,10 +19,20 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    EXTRACTOR_ML_API_URL
+      ? null
+      : "Configura VITE_EXTRACTOR_ML_API_URL (nessun URL Cloud Run hardcoded nel browser).",
+  );
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!EXTRACTOR_ML_API_URL) {
+      setError(
+        "Configura VITE_EXTRACTOR_ML_API_URL (nessun URL Cloud Run hardcoded nel browser).",
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -74,8 +83,10 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
         </div>
         <h1>Accedi con Lucy</h1>
         <p>
-          Il browser autentica solo verso Lucy. Il Google ID token per Cloud Run
-          viene generato esclusivamente dal BFF.
+          Il browser autentica solo verso Lucy tramite{" "}
+          <code>VITE_EXTRACTOR_ML_API_URL</code>. L&apos;autenticazione verso il
+          dispatcher resta sul BFF (
+          <code>DISPATCHER_AUTH_MODE</code>).
         </p>
         <label>
           Username
@@ -97,7 +108,11 @@ export function LoginScreen({ onAuthenticated }: LoginScreenProps) {
           />
         </label>
         {error ? <div className="login-error">{error}</div> : null}
-        <button className="primary" type="submit" disabled={busy}>
+        <button
+          className="primary"
+          type="submit"
+          disabled={busy || !EXTRACTOR_ML_API_URL}
+        >
           {busy ? <Loader2 className="spin" size={16} /> : <LogIn size={16} />}
           Accedi
         </button>

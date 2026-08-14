@@ -2,24 +2,10 @@
 
 SPA React + TypeScript (Vite) per configurare, validare e simulare i flussi del dispatcher.
 
-## Autenticazione (obbligatoria)
-
-Il Cloud Run dispatcher è **privato** e richiede:
-
-```http
-Authorization: Bearer <Google Cloud ID token>
-```
-
-con audience:
+## Autenticazione
 
 ```text
-https://extractor-ml-dispatcher-727480764999.europe-west1.run.app
-```
-
-### Flusso corretto
-
-```text
-Browser  --(Lucy session)-->  BFF  --(Google ID token)-->  Cloud Run dispatcher
+Browser  --(Lucy session)-->  BFF  --(upstream auth adapter)-->  Dispatcher API
 ```
 
 1. Il **browser** invia solo header Lucy verso il BFF:
@@ -28,23 +14,26 @@ Browser  --(Lucy session)-->  BFF  --(Google ID token)-->  Cloud Run dispatcher
 2. Il **BFF** (`server/bff.mjs`):
    - valida la sessione Lucy su `EXTRACTOR_ML_API_URL/auth/me`
    - applica i ruoli `viewer` / `editor` / `operator`
-   - genera un Google ID token (ADC, metadata server GCP, oppure `GOOGLE_ID_TOKEN` solo server)
-   - chiama il dispatcher con `Authorization: Bearer <id-token>`
-3. Il browser **non** genera, conserva o invia Google ID token / API key.
+   - autentica verso l’upstream secondo `DISPATCHER_AUTH_MODE`
+3. Il browser **non** genera, conserva o invia Google ID token / API key / URL Cloud Run hardcoded.
 
-`X-API-Key` può esistere lato dispatcher come protezione opzionale, ma `DISPATCHER_API_KEYS` non è configurato e **non** va mai messo nel bundle Vite.
+### `DISPATCHER_AUTH_MODE`
 
-Se in produzione usi il backend **extractor-ml** come BFF, il browser continua a inviare gli stessi header Lucy; è quel backend a fare ID token + forward.
+| Mode | Uso |
+| --- | --- |
+| `google_id_token` (default) | Cloud Run IAM (ADC / metadata / `GOOGLE_ID_TOKEN`) |
+| `bearer` | Token server-only `DISPATCHER_BEARER_TOKEN` |
+| `none` | Nessun header `Authorization` (rete già isolata) |
 
 ## Avvio locale
 
 ```bash
 cp .env.example .env
+# Compila DISPATCHER_API_URL, EXTRACTOR_ML_API_URL, VITE_EXTRACTOR_ML_API_URL, DISPATCHER_AUDIENCE
 npm install
 
 # terminale 1 — BFF
-export DISPATCHER_API_URL=https://extractor-ml-dispatcher-727480764999.europe-west1.run.app
-export DISPATCHER_AUDIENCE="$DISPATCHER_API_URL"
+export DISPATCHER_AUTH_MODE=google_id_token
 export GOOGLE_ID_TOKEN="$(gcloud auth print-identity-token --audiences="$DISPATCHER_AUDIENCE")"
 npm run dev:bff
 
@@ -62,14 +51,17 @@ VITE_USE_DISPATCHER_MOCKS=true npm run dev
 
 | Variabile | Dove | Note |
 | --- | --- | --- |
-| `VITE_DISPATCHER_API_BASE` | Browser | Default `/api/dispatcher` (same-origin → BFF) |
-| `VITE_EXTRACTOR_ML_API_URL` | Browser | Solo login Lucy `/auth/login` |
+| `VITE_DISPATCHER_API_BASE` | Browser | Default `/api/dispatcher` |
+| `VITE_EXTRACTOR_ML_API_URL` | Browser | **Obbligatoria** per login Lucy |
 | `VITE_USE_DISPATCHER_MOCKS` | Browser | Mock espliciti |
-| `DISPATCHER_API_URL` | BFF | Cloud Run dispatcher |
-| `DISPATCHER_AUDIENCE` | BFF | Audience ID token (= URL dispatcher) |
-| `EXTRACTOR_ML_API_URL` | BFF | Validazione sessione Lucy |
-| `GOOGLE_ID_TOKEN` | **Solo BFF** | Fallback locale short-lived |
-| `BFF_SKIP_LUCY_AUTH` | BFF | Solo sviluppo |
+| `DISPATCHER_API_URL` | BFF | **Obbligatoria** |
+| `DISPATCHER_AUDIENCE` | BFF | Audience ID token (default = API URL) |
+| `EXTRACTOR_ML_API_URL` | BFF | **Obbligatoria** salvo `BFF_SKIP_LUCY_AUTH` |
+| `DISPATCHER_AUTH_MODE` | BFF | `google_id_token` \| `bearer` \| `none` |
+| `DISPATCHER_BEARER_TOKEN` | BFF | Solo mode `bearer` |
+| `GOOGLE_ID_TOKEN` | BFF | Fallback locale short-lived |
+| `STATIC_DIR` | BFF | Default `dist` (SPA statica) |
+| `PORT` / `BFF_PORT` | BFF | Default `8787` (container: `8080`) |
 
 **Non esistono** variabili `VITE_*` per Google token o API key.
 
@@ -78,15 +70,24 @@ VITE_USE_DISPATCHER_MOCKS=true npm run dev
 | Script | Descrizione |
 | --- | --- |
 | `npm run dev` | Vite SPA (proxy verso BFF) |
-| `npm run dev:bff` | BFF Lucy + Google ID token |
+| `npm run dev:bff` | BFF + static (se `dist/` presente) |
 | `npm run build` | Typecheck + build |
 | `npm test` | Vitest |
 | `npm run lint` | ESLint |
 
-## Deploy
+## Deploy (container portabile)
 
-1. Build SPA: `npm run build` → `dist/`
-2. Esporre la SPA dietro hosting statico
-3. Mettere il BFF (questo o extractor-ml core) davanti al Cloud Run privato
-4. Il BFF usa la service identity per mintare ID token con audience del dispatcher
-5. Nessuna credenziale cloud nel JavaScript del browser
+```bash
+docker build \
+  --build-arg VITE_EXTRACTOR_ML_API_URL=https://your-lucy-api \
+  -t extractor-ml-dispatcher-frontend .
+
+docker run --rm -p 8080:8080 \
+  -e DISPATCHER_API_URL=https://your-dispatcher \
+  -e DISPATCHER_AUDIENCE=https://your-dispatcher \
+  -e EXTRACTOR_ML_API_URL=https://your-lucy-api \
+  -e DISPATCHER_AUTH_MODE=google_id_token \
+  extractor-ml-dispatcher-frontend
+```
+
+Il BFF serve `dist/` e fa da proxy `/api/dispatcher`. Su GCP può usare la service identity; altrove puoi passare a `bearer` / `none` senza toccare la SPA.
