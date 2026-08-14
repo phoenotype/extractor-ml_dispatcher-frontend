@@ -27,7 +27,24 @@ export function useFlowMutations() {
   });
 
   const deactivateFlow = useMutation({
-    mutationFn: (flowName: string) => dispatcherApi.deactivateFlow(flowName),
+    mutationFn: ({
+      flowName,
+      expectedUpdatedAt,
+    }: {
+      flowName: string;
+      expectedUpdatedAt?: string;
+    }) => dispatcherApi.deactivateFlow(flowName, { expectedUpdatedAt }),
+    onSuccess: invalidate,
+  });
+
+  const activateFlow = useMutation({
+    mutationFn: ({
+      flowName,
+      expectedUpdatedAt,
+    }: {
+      flowName: string;
+      expectedUpdatedAt?: string;
+    }) => dispatcherApi.activateFlow(flowName, { expectedUpdatedAt }),
     onSuccess: invalidate,
   });
 
@@ -69,6 +86,7 @@ export function useFlowMutations() {
     createFlow,
     updateFlow,
     deactivateFlow,
+    activateFlow,
     validate,
     validateFlow,
     simulate,

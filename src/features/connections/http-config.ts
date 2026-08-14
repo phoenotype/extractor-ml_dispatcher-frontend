@@ -2,6 +2,10 @@ import type { HttpConnection, HttpAuthType } from "@/types/connection";
 
 const SENSITIVE_URL_RE =
   /\/key\/|([?&]|^)(token|api[_-]?key|password|secret|access_token)=/i;
+const SECRET_KEY_RE =
+  /(^|_)(authorization|password|passwd|token|api[_-]?key|secret|client[_-]?secret)($|_)/i;
+const SECRET_VALUE_RE = /\b(?:bearer|basic)\s+[a-z0-9._~+/-]+=*/i;
+const ENV_NAME_RE = /^[A-Z][A-Z0-9_]*$/;
 
 export function looksLikeAbsoluteUrl(value: string): boolean {
   return /^https?:\/\//i.test(value.trim());
@@ -14,6 +18,31 @@ export function isRelativeHttpPath(value: string): boolean {
 
 export function pathLooksSensitive(value: string): boolean {
   return SENSITIVE_URL_RE.test(value);
+}
+
+export function isEnvironmentVariableName(value: string): boolean {
+  return ENV_NAME_RE.test(value.trim());
+}
+
+export function containsEmbeddedSecret(
+  value: unknown,
+  parentKey = "",
+): boolean {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+    if (pathLooksSensitive(trimmed) || SECRET_VALUE_RE.test(trimmed)) return true;
+    return SECRET_KEY_RE.test(parentKey) && !isEnvironmentVariableName(trimmed);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => containsEmbeddedSecret(item, parentKey));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).some(([key, child]) =>
+      containsEmbeddedSecret(child, key),
+    );
+  }
+  return false;
 }
 
 export function isValidStatusCode(value: unknown): value is number {
@@ -115,10 +144,7 @@ export function validateHttpRequestConfig(
     issues.push("timeoutSeconds deve essere omesso oppure compreso tra 1 e 120");
   }
 
-  const blob = JSON.stringify(config);
-  if (
-    /"(password|token|apiKey|api_key|authorization)"\s*:\s*"[^"]+"/i.test(blob)
-  ) {
+  if (containsEmbeddedSecret(config)) {
     issues.push(
       "Non inserire segreti nel JSON del flusso: usa connectionRef e variabili d'ambiente",
     );
@@ -148,6 +174,15 @@ export function validateConnectionDraft(
     );
   }
 
+  for (const prefix of draft.allowedPathPrefixes || []) {
+    if (pathLooksSensitive(prefix)) {
+      issues.push(
+        "allowedPathPrefixes non può contenere token, chiavi o altri segreti",
+      );
+      break;
+    }
+  }
+
   const authType = (draft.authType || "none") as HttpAuthType;
   const authConfig = draft.authConfig || {};
   if (authType === "bearer_env" && !authConfig.tokenEnv?.trim()) {
@@ -171,7 +206,10 @@ export function validateConnectionDraft(
   }
 
   for (const [key, value] of Object.entries(authConfig)) {
-    if (/token|password|secret|key/i.test(key) && /[=:]/.test(value)) {
+    if (
+      key !== "headerName" &&
+      (!key.endsWith("Env") || !isEnvironmentVariableName(value))
+    ) {
       issues.push(
         `authConfig.${key} deve contenere solo il nome della variabile d'ambiente`,
       );
@@ -201,7 +239,11 @@ export function validateConnectionDraft(
 }
 
 export function normalizeConnection(draft: HttpConnection): HttpConnection {
+  const hasUrl = Boolean(draft.baseUrl?.trim());
   const hasEnv = Boolean(draft.baseUrlEnv?.trim());
+  if (hasUrl === hasEnv) {
+    throw new Error("Valorizza esattamente uno tra baseUrl e baseUrlEnv");
+  }
   return {
     connectionName: draft.connectionName.trim(),
     ...(hasEnv

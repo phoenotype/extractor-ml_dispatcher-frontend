@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  containsEmbeddedSecret,
   isRelativeHttpPath,
   looksLikeAbsoluteUrl,
   pathLooksSensitive,
+  normalizeConnection,
   sanitizeHttpRequestConfig,
   validateHttpRequestConfig,
 } from "@/features/connections/http-config";
@@ -32,6 +34,24 @@ describe("connections API (mock)", () => {
           Boolean(item.baseUrlEnv),
       ),
     ).toBe(true);
+  });
+
+  it("serializza IFTTT con il solo riferimento alla variabile d'ambiente", () => {
+    const normalized = normalizeConnection({
+      connectionName: "ifttt_dispatcher",
+      baseUrlEnv: "IFTTT_WEBHOOK_BASE_URL",
+      authType: "none",
+      authConfig: {},
+      defaultHeaders: {},
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+      timeoutSeconds: 20,
+      isActive: true,
+    });
+
+    expect(normalized.baseUrlEnv).toBe("IFTTT_WEBHOOK_BASE_URL");
+    expect(normalized.allowedPathPrefixes).toEqual(["/"]);
+    expect(normalized).not.toHaveProperty("baseUrl");
   });
 });
 
@@ -145,6 +165,9 @@ describe("connectionRef e path HTTP", () => {
       connections,
     );
     expect(issues.some((msg) => /segreti/i.test(msg))).toBe(true);
+    expect(
+      containsEmbeddedSecret({ authConfig: { token: "super-secret" } }),
+    ).toBe(true);
   });
 
   it("segnala URL sensibili nel path", () => {

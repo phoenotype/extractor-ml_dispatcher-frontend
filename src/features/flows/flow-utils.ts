@@ -6,7 +6,11 @@ import type {
   FlowNodeDefinition,
   ValidationIssue,
 } from "@/types/flow";
-import { sanitizeHttpRequestConfig, validateHttpRequestConfig } from "@/features/connections/http-config";
+import {
+  containsEmbeddedSecret,
+  sanitizeHttpRequestConfig,
+  validateHttpRequestConfig,
+} from "@/features/connections/http-config";
 import {
   CircleStop,
   GitBranch,
@@ -349,6 +353,12 @@ export function preliminaryValidate(
   connections: HttpConnection[] = [],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  if (containsEmbeddedSecret(flow)) {
+    issues.push({
+      message:
+        "Il JSON del flusso non può contenere segreti: usa una connessione configurata tramite variabili d'ambiente",
+    });
+  }
   const triggers = flow.nodes.filter(
     (node) => catalogNode(catalog, node.type).category === "trigger",
   );

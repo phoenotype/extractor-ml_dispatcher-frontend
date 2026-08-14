@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   flowListItemSchema,
   flowListPayloadSchema,
+  httpConnectionSchema,
   simulationResultSchema,
 } from "@/services/api/schemas";
 import { normalizeFlowList } from "@/services/api/dispatcher";
@@ -105,8 +106,7 @@ describe("simulation result schema", () => {
 });
 
 describe("HTTP connection schema", () => {
-  it("normalizza i campi URL null restituiti da backend precedenti", async () => {
-    const { httpConnectionSchema } = await import("@/services/api/schemas");
+  it("normalizza baseUrlEnv null restituito da backend precedenti", () => {
     const parsed = httpConnectionSchema.parse({
       connectionName: "ifttt_dispatcher",
       baseUrl: "https://maker.ifttt.com",
@@ -121,5 +121,22 @@ describe("HTTP connection schema", () => {
     });
     expect(parsed.baseUrl).toBe("https://maker.ifttt.com");
     expect(parsed.baseUrlEnv).toBeUndefined();
+  });
+
+  it("normalizza baseUrl null restituito da backend precedenti", () => {
+    const parsed = httpConnectionSchema.parse({
+      connectionName: "ifttt_dispatcher",
+      baseUrl: null,
+      baseUrlEnv: "IFTTT_WEBHOOK_BASE_URL",
+      authType: "none",
+      authConfig: {},
+      defaultHeaders: {},
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+      timeoutSeconds: 20,
+      isActive: true,
+    });
+    expect(parsed.baseUrl).toBeUndefined();
+    expect(parsed.baseUrlEnv).toBe("IFTTT_WEBHOOK_BASE_URL");
   });
 });

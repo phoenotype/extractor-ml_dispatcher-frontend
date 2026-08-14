@@ -33,7 +33,7 @@ export function FlowListPage() {
   const canEdit = canEditFlows(role);
   const { useMocks } = getDispatcherConfig();
   const flowsQuery = useFlowsQuery();
-  const { createFlow, deactivateFlow, updateFlow } = useFlowMutations();
+  const { activateFlow, createFlow, deactivateFlow } = useFlowMutations();
 
   const [filters, setFilters] = useState<FlowFiltersState>({
     search: "",
@@ -165,26 +165,9 @@ export function FlowListPage() {
         setNotice("Impossibile attivare un flusso legacy da questa UI.");
         return;
       }
-      const validation = await dispatcherApi.validateFlow(item.flowName, {
-        flowDefinition: detail.flowDefinition,
-      });
-      if (!validation.valid) {
-        setNotice(
-          "Il flusso non è valido: correggi gli errori prima di attivarlo.",
-        );
-        return;
-      }
-      await updateFlow.mutateAsync({
+      await activateFlow.mutateAsync({
         flowName: item.flowName,
-        body: {
-          flowDefinition: detail.flowDefinition,
-          description: detail.description,
-          documentType: detail.documentType,
-          isActive: true,
-          metadata: detail.metadata,
-          expectedUpdatedAt:
-            detail.expectedUpdatedAt || detail.updatedAt || "",
-        },
+        expectedUpdatedAt: detail.expectedUpdatedAt || detail.updatedAt,
       });
       setNotice("Flusso attivato");
     } catch (error) {
@@ -272,13 +255,17 @@ export function FlowListPage() {
       {deactivateTarget ? (
         <ConfirmDialog
           title="Disattiva flusso"
-          description={`Confermi la disattivazione di “${deactivateTarget.flowName}”? Verrà inviata una DELETE al backend.`}
+          description={`Confermi la disattivazione di “${deactivateTarget.flowName}”?`}
           confirmLabel="Disattiva"
           danger
           onCancel={() => setDeactivateTarget(null)}
           onConfirm={() => {
             void deactivateFlow
-              .mutateAsync(deactivateTarget.flowName)
+              .mutateAsync({
+                flowName: deactivateTarget.flowName,
+                expectedUpdatedAt:
+                  deactivateTarget.expectedUpdatedAt || deactivateTarget.updatedAt,
+              })
               .then(() => setNotice("Flusso disattivato"))
               .catch((error: unknown) =>
                 setNotice(

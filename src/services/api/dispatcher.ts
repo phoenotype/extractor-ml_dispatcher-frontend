@@ -2,6 +2,7 @@ import type {
   ApiResult,
   CreateFlowBody,
   DispatcherApi,
+  FlowStatusBody,
   UpdateFlowBody,
   ValidateFlowBody,
 } from "@/types/api";
@@ -16,7 +17,10 @@ import type {
   SimulationResult,
   ValidationResult,
 } from "@/types/flow";
-import { validateHttpRequestConfig } from "@/features/connections/http-config";
+import {
+  normalizeConnection,
+  validateHttpRequestConfig,
+} from "@/features/connections/http-config";
 import { ApiError, assertOk } from "./client";
 import { getDispatcherConfig } from "./config";
 import { dispatcherFetch } from "./http";
@@ -214,6 +218,14 @@ export function normalizeConnections(payload: unknown): HttpConnection[] {
   return parsed.connections;
 }
 
+export function parseConnectionWriteResponse(
+  payload: unknown,
+  fallback: HttpConnection,
+): HttpConnection {
+  const parsed = httpConnectionSchema.safeParse(payload);
+  return parsed.success ? parsed.data : fallback;
+}
+
 const mockStore = {
   items: structuredClone(mockFlowItems),
   details: structuredClone(mockFlowDetails) as Record<string, FlowDetail>,
@@ -296,12 +308,45 @@ const mockApi: DispatcherApi = {
     return structuredClone(detail);
   },
 
-  async deactivateFlow(flowName: string): Promise<void> {
+  async activateFlow(
+    flowName: string,
+    body: FlowStatusBody = {},
+  ): Promise<FlowDetail> {
+    await delay();
+    const existing = mockStore.details[flowName];
+    if (!existing) throw new ApiError(404, `Flusso non trovato: ${flowName}`);
+    if (
+      body.expectedUpdatedAt &&
+      existing.expectedUpdatedAt &&
+      body.expectedUpdatedAt !== existing.expectedUpdatedAt
+    ) {
+      throw new ApiError(409, "expectedUpdatedAt non corrisponde");
+    }
+    const now = new Date().toISOString();
+    const detail = { ...existing, isActive: true, updatedAt: now, expectedUpdatedAt: now };
+    mockStore.details[flowName] = detail;
+    mockStore.items = mockStore.items.map((item) =>
+      item.flowName === flowName ? detail : item,
+    );
+    return structuredClone(detail);
+  },
+
+  async deactivateFlow(
+    flowName: string,
+    body: FlowStatusBody = {},
+  ): Promise<FlowDetail> {
     await delay();
     if (!mockStore.details[flowName]) {
       throw new ApiError(404, `Flusso non trovato: ${flowName}`);
     }
     const existing = mockStore.details[flowName];
+    if (
+      body.expectedUpdatedAt &&
+      existing.expectedUpdatedAt &&
+      body.expectedUpdatedAt !== existing.expectedUpdatedAt
+    ) {
+      throw new ApiError(409, "expectedUpdatedAt non corrisponde");
+    }
     const now = new Date().toISOString();
     const detail: FlowDetail = {
       ...existing,
@@ -313,6 +358,7 @@ const mockApi: DispatcherApi = {
     mockStore.items = mockStore.items.map((item) =>
       item.flowName === flowName ? detail : item,
     );
+    return structuredClone(detail);
   },
 
   async listConnections(): Promise<ApiResult<HttpConnection[]>> {
@@ -466,8 +512,26 @@ const liveApi: DispatcherApi = {
     return normalizeFlowDetail(payload, flowName);
   },
 
-  async deactivateFlow(flowName: string): Promise<void> {
-    await requestJson(`/flows/${encodeName(flowName)}`, { method: "DELETE" });
+  async activateFlow(
+    flowName: string,
+    body: FlowStatusBody = {},
+  ): Promise<FlowDetail> {
+    const payload = await requestJson(`/flows/${encodeName(flowName)}/activate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return normalizeFlowDetail(payload, flowName);
+  },
+
+  async deactivateFlow(
+    flowName: string,
+    body: FlowStatusBody = {},
+  ): Promise<FlowDetail> {
+    const payload = await requestJson(`/flows/${encodeName(flowName)}/deactivate`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    return normalizeFlowDetail(payload, flowName);
   },
 
   async listConnections(): Promise<ApiResult<HttpConnection[]>> {
@@ -484,11 +548,14 @@ const liveApi: DispatcherApi = {
     connectionName: string,
     body: HttpConnection,
   ): Promise<HttpConnection> {
+    const requestBody = normalizeConnection({ ...body, connectionName });
     const payload = await requestJson(`/connections/${encodeName(connectionName)}`, {
       method: "PUT",
-      body: JSON.stringify({ ...body, connectionName }),
+      body: JSON.stringify(requestBody),
     });
-    return httpConnectionSchema.parse(payload);
+    // A successful PUT remains successful even if an older backend revision
+    // returns a response shape the current client cannot parse.
+    return parseConnectionWriteResponse(payload, requestBody);
   },
 
   async validate(body: ValidateFlowBody): Promise<ValidationResult> {

@@ -205,7 +205,13 @@ export const httpConnectionSchema = z
     timeoutSeconds: z.number(),
     isActive: z.boolean(),
   })
-  .passthrough();
+  .passthrough()
+  .refine(
+    (connection) =>
+      Boolean(connection.baseUrl?.trim()) !==
+      Boolean(connection.baseUrlEnv?.trim()),
+    { message: "Valorizza esattamente uno tra baseUrl e baseUrlEnv" },
+  );
 
 export const httpConnectionListPayloadSchema = z.union([
   z.array(httpConnectionSchema),

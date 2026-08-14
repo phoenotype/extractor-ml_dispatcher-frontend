@@ -47,7 +47,10 @@ import {
 import { useCatalogQuery } from "@/features/flows/useCatalogQuery";
 import { useFlowMutations } from "@/features/flows/useFlowMutations";
 import { useConnectionsQuery } from "@/features/connections/useConnectionsQuery";
-import { sanitizeHttpRequestConfig } from "@/features/connections/http-config";
+import {
+  containsEmbeddedSecret,
+  sanitizeHttpRequestConfig,
+} from "@/features/connections/http-config";
 import { RunConfirmDialog } from "@/features/simulation/RunConfirmDialog";
 import { SimulationModal } from "@/features/simulation/SimulationModal";
 import { useSimulationHighlight } from "@/features/simulation/useSimulationHighlight";
@@ -723,6 +726,11 @@ export function FlowEditorPage() {
   const applyJson = () => {
     try {
       const parsed = JSON.parse(jsonDraft) as FlowDefinition;
+      if (containsEmbeddedSecret(parsed)) {
+        throw new Error(
+          "Il JSON del flusso non può contenere segreti: usa una connessione configurata tramite variabili d'ambiente",
+        );
+      }
       if (parsed.schemaVersion !== 1) {
         throw new Error("È supportato solo schemaVersion: 1");
       }
@@ -856,6 +864,11 @@ export function FlowEditorPage() {
                   void file.text().then((text) => {
                     try {
                       const parsed = JSON.parse(text) as FlowDefinition;
+                      if (containsEmbeddedSecret(parsed)) {
+                        throw new Error(
+                          "Il JSON del flusso non può contenere segreti: usa una connessione configurata tramite variabili d'ambiente",
+                        );
+                      }
                       if (parsed.schemaVersion !== 1) throw new Error();
                       commitFlow(parsed);
                       setNotice("Flusso importato");

@@ -45,13 +45,18 @@ export interface ValidateFlowBody {
   flowDefinition: FlowDefinition;
 }
 
+export interface FlowStatusBody {
+  expectedUpdatedAt?: string;
+}
+
 export interface DispatcherApi {
   getCatalog(): Promise<ApiResult<Catalog>>;
   listFlows(options?: { activeOnly?: boolean }): Promise<ApiResult<FlowListItem[]>>;
   getFlow(flowName: string): Promise<FlowDetail>;
   createFlow(body: CreateFlowBody): Promise<FlowDetail>;
   updateFlow(flowName: string, body: UpdateFlowBody): Promise<FlowDetail>;
-  deactivateFlow(flowName: string): Promise<void>;
+  activateFlow(flowName: string, body?: FlowStatusBody): Promise<FlowDetail>;
+  deactivateFlow(flowName: string, body?: FlowStatusBody): Promise<FlowDetail>;
   listConnections(): Promise<ApiResult<HttpConnection[]>>;
   getConnection(connectionName: string): Promise<HttpConnection>;
   upsertConnection(

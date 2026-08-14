@@ -193,6 +193,12 @@ function requiredActionFor(method, path) {
   if (method === "POST" && /\/validate$/.test(normalized)) {
     return "DISPATCHER_VALIDATE";
   }
+  if (method === "POST" && /\/activate$/.test(normalized)) {
+    return "DISPATCHER_EDIT";
+  }
+  if (method === "POST" && /\/deactivate$/.test(normalized)) {
+    return "DISPATCHER_DEACTIVATE";
+  }
   if (method === "POST" && normalized === "/flows") {
     return "DISPATCHER_CREATE";
   }
