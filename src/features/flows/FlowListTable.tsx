@@ -80,10 +80,15 @@ export function FlowListTable({
         <span>Aggiornato</span>
         <span />
       </div>
-      {items.map((item) => {
+      {items.map((item, index) => {
         const legacy = item.format === "legacy" || !item.editable;
+        const menuOpen = menuFor === item.flowName;
+        const openUpward = index >= items.length - 2;
         return (
-          <div className="table-row table-row-wide" key={item.flowName}>
+          <div
+            className={`table-row table-row-wide${menuOpen ? " menu-open" : ""}`}
+            key={item.flowName}
+          >
             <button
               type="button"
               className="table-main"
@@ -123,6 +128,7 @@ export function FlowListTable({
                 type="button"
                 className="icon-button"
                 aria-label="Azioni"
+                aria-expanded={menuOpen}
                 onClick={() =>
                   setMenuFor((current) =>
                     current === item.flowName ? null : item.flowName,
@@ -131,8 +137,10 @@ export function FlowListTable({
               >
                 <MoreHorizontal size={18} />
               </button>
-              {menuFor === item.flowName ? (
-                <div className="row-menu">
+              {menuOpen ? (
+                <div
+                  className={`row-menu${openUpward ? " row-menu-up" : ""}`}
+                >
                   <button type="button" onClick={() => onOpen(item)}>
                     Apri
                   </button>

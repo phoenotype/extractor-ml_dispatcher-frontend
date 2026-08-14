@@ -492,7 +492,7 @@ button {
   background: #fff;
   border: 1px solid #e1e1e1;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 24px 15px rgba(0, 0, 0, 0.015),
     0 3px 6px rgba(0, 0, 0, 0.025);
 }
@@ -2219,6 +2219,7 @@ html[data-theme="dark"] .field-path-selected {
   border-bottom: 1px solid #edf0f4;
   position: relative;
 }
+.table-row-wide.menu-open { z-index: 30; }
 .table-main {
   border: 0;
   background: transparent;
@@ -2242,6 +2243,10 @@ html[data-theme="dark"] .field-path-selected {
   box-shadow: 0 12px 30px rgba(0,0,0,0.1);
   z-index: 25;
   overflow: hidden;
+}
+.row-menu-up {
+  top: auto;
+  bottom: 48px;
 }
 .row-menu button {
   width: 100%;
