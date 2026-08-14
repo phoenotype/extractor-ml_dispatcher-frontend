@@ -310,7 +310,7 @@ const mockApi: DispatcherApi = {
 
   async activateFlow(
     flowName: string,
-    body: FlowStatusBody = {},
+    body: FlowStatusBody,
   ): Promise<FlowDetail> {
     await delay();
     const existing = mockStore.details[flowName];
@@ -333,7 +333,7 @@ const mockApi: DispatcherApi = {
 
   async deactivateFlow(
     flowName: string,
-    body: FlowStatusBody = {},
+    body: FlowStatusBody,
   ): Promise<FlowDetail> {
     await delay();
     if (!mockStore.details[flowName]) {
@@ -514,7 +514,7 @@ const liveApi: DispatcherApi = {
 
   async activateFlow(
     flowName: string,
-    body: FlowStatusBody = {},
+    body: FlowStatusBody,
   ): Promise<FlowDetail> {
     const payload = await requestJson(`/flows/${encodeName(flowName)}/activate`, {
       method: "POST",
@@ -525,7 +525,7 @@ const liveApi: DispatcherApi = {
 
   async deactivateFlow(
     flowName: string,
-    body: FlowStatusBody = {},
+    body: FlowStatusBody,
   ): Promise<FlowDetail> {
     const payload = await requestJson(`/flows/${encodeName(flowName)}/deactivate`, {
       method: "POST",

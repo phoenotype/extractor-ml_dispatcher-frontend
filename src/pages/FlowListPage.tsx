@@ -22,7 +22,7 @@ import { canEditFlows } from "@/features/flows/permissions";
 import { useFlowMutations } from "@/features/flows/useFlowMutations";
 import { useFlowsQuery } from "@/features/flows/useFlowsQuery";
 import { useRole } from "@/hooks/useRole";
-import { ApiError } from "@/services/api/client";
+import { ApiError, flowStatusErrorMessage } from "@/services/api/client";
 import { getDispatcherConfig } from "@/services/api/config";
 import { dispatcherApi, starterFlow } from "@/services/api/dispatcher";
 import type { FlowListItem } from "@/types/flow";
@@ -172,7 +172,7 @@ export function FlowListPage() {
       setNotice("Flusso attivato");
     } catch (error) {
       setNotice(
-        error instanceof ApiError ? error.message : "Attivazione non riuscita",
+        flowStatusErrorMessage(error),
       );
     }
   };
@@ -269,9 +269,7 @@ export function FlowListPage() {
               .then(() => setNotice("Flusso disattivato"))
               .catch((error: unknown) =>
                 setNotice(
-                  error instanceof ApiError
-                    ? error.message
-                    : "Disattivazione non riuscita",
+                  flowStatusErrorMessage(error),
                 ),
               )
               .finally(() => setDeactivateTarget(null));

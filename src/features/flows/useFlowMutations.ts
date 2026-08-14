@@ -1,13 +1,51 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { dispatcherApi } from "@/services/api/dispatcher";
-import type { CreateFlowBody, UpdateFlowBody, ValidateFlowBody } from "@/types/api";
-import type { RunRequest, SimulationRequest } from "@/types/flow";
+import { dispatcherApi, normalizeListItem } from "@/services/api/dispatcher";
+import type {
+  ApiResult,
+  CreateFlowBody,
+  UpdateFlowBody,
+  ValidateFlowBody,
+} from "@/types/api";
+import type {
+  FlowDetail,
+  FlowListItem,
+  RunRequest,
+  SimulationRequest,
+} from "@/types/flow";
 
 export function useFlowMutations() {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["flows"] });
+  };
+
+  const updateFlowStatusCache = (detail: FlowDetail) => {
+    const item = normalizeListItem(detail as unknown as Record<string, unknown>);
+    queryClient.setQueriesData<ApiResult<FlowListItem[]>>(
+      { queryKey: ["flows"] },
+      (current) =>
+        current
+          ? {
+              ...current,
+              data: current.data.map((flow) =>
+                flow.flowName === detail.flowName ? item : flow,
+              ),
+            }
+          : current,
+    );
+    invalidate();
+  };
+
+  const resolveExpectedUpdatedAt = async (
+    flowName: string,
+    expectedUpdatedAt?: string,
+  ) => {
+    if (expectedUpdatedAt) return expectedUpdatedAt;
+    const latest = await dispatcherApi.getFlow(flowName);
+    const token = latest.expectedUpdatedAt || latest.updatedAt;
+    if (!token) throw new Error("updatedAt non disponibile per il flusso");
+    return token;
   };
 
   const createFlow = useMutation({
@@ -33,8 +71,11 @@ export function useFlowMutations() {
     }: {
       flowName: string;
       expectedUpdatedAt?: string;
-    }) => dispatcherApi.deactivateFlow(flowName, { expectedUpdatedAt }),
-    onSuccess: invalidate,
+    }) =>
+      resolveExpectedUpdatedAt(flowName, expectedUpdatedAt).then((token) =>
+        dispatcherApi.deactivateFlow(flowName, { expectedUpdatedAt: token }),
+      ),
+    onSuccess: updateFlowStatusCache,
   });
 
   const activateFlow = useMutation({
@@ -44,8 +85,11 @@ export function useFlowMutations() {
     }: {
       flowName: string;
       expectedUpdatedAt?: string;
-    }) => dispatcherApi.activateFlow(flowName, { expectedUpdatedAt }),
-    onSuccess: invalidate,
+    }) =>
+      resolveExpectedUpdatedAt(flowName, expectedUpdatedAt).then((token) =>
+        dispatcherApi.activateFlow(flowName, { expectedUpdatedAt: token }),
+      ),
+    onSuccess: updateFlowStatusCache,
   });
 
   const validate = useMutation({

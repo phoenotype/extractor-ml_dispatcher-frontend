@@ -75,6 +75,26 @@ export class ApiError extends Error {
   }
 }
 
+export function flowStatusErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return "Operazione non riuscita";
+  if (error.status === 404) return "Flusso non trovato";
+  if (error.status === 409) {
+    return "Il flusso è stato modificato da un altro utente. Ricarica e riprova";
+  }
+  if (error.status === 422) {
+    const details = Array.isArray(error.details) ? error.details : [];
+    const messages = details
+      .map((detail) =>
+        detail && typeof detail === "object" && "msg" in detail
+          ? String((detail as { msg: unknown }).msg)
+          : "",
+      )
+      .filter(Boolean);
+    return messages.length > 0 ? messages.join(" · ") : error.message;
+  }
+  return error.message;
+}
+
 function extractDetailMessage(body: unknown): string | undefined {
   if (!body || typeof body !== "object") return undefined;
   const detail = (body as { detail?: unknown }).detail;

@@ -46,7 +46,7 @@ export interface ValidateFlowBody {
 }
 
 export interface FlowStatusBody {
-  expectedUpdatedAt?: string;
+  expectedUpdatedAt: string;
 }
 
 export interface DispatcherApi {
@@ -55,8 +55,8 @@ export interface DispatcherApi {
   getFlow(flowName: string): Promise<FlowDetail>;
   createFlow(body: CreateFlowBody): Promise<FlowDetail>;
   updateFlow(flowName: string, body: UpdateFlowBody): Promise<FlowDetail>;
-  activateFlow(flowName: string, body?: FlowStatusBody): Promise<FlowDetail>;
-  deactivateFlow(flowName: string, body?: FlowStatusBody): Promise<FlowDetail>;
+  activateFlow(flowName: string, body: FlowStatusBody): Promise<FlowDetail>;
+  deactivateFlow(flowName: string, body: FlowStatusBody): Promise<FlowDetail>;
   listConnections(): Promise<ApiResult<HttpConnection[]>>;
   getConnection(connectionName: string): Promise<HttpConnection>;
   upsertConnection(
