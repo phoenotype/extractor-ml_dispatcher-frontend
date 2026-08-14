@@ -71,7 +71,10 @@ export function FlowEditorPage() {
   const catalogQuery = useCatalogQuery();
   const connectionsQuery = useConnectionsQuery();
   const mutations = useFlowMutations();
-  const connections = connectionsQuery.data?.data ?? [];
+  const connections = useMemo(
+    () => connectionsQuery.data?.data ?? [],
+    [connectionsQuery.data?.data],
+  );
 
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<FlowDetail | null>(null);
@@ -100,6 +103,7 @@ export function FlowEditorPage() {
   const [recentSimulationAt, setRecentSimulationAt] = useState<number | null>(
     null,
   );
+  const [clock, setClock] = useState(() => Date.now());
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [showSimModal, setShowSimModal] = useState(false);
@@ -112,6 +116,10 @@ export function FlowEditorPage() {
   const [jsonError, setJsonError] = useState<string | null>(null);
   const history = useRef<FlowDefinition[]>([]);
   const future = useRef<FlowDefinition[]>([]);
+  const [historyAvailability, setHistoryAvailability] = useState({
+    canUndo: false,
+    canRedo: false,
+  });
   const fileInput = useRef<HTMLInputElement>(null);
 
   const catalog = catalogQuery.data?.data;
@@ -175,6 +183,7 @@ export function FlowEditorPage() {
         history.current.push(cloneFlow(flow));
         history.current = history.current.slice(-40);
         future.current = [];
+        setHistoryAvailability({ canUndo: true, canRedo: false });
       }
       setFlow(next);
       syncGraph(next, { selectedId });
@@ -187,6 +196,9 @@ export function FlowEditorPage() {
 
   const loadFlow = useCallback(async () => {
     if (!catalog) return;
+    history.current = [];
+    future.current = [];
+    setHistoryAvailability({ canUndo: false, canRedo: false });
     setLoading(true);
     try {
       if (isNew) {
@@ -272,6 +284,8 @@ export function FlowEditorPage() {
   }, [catalog, isNew, routeName, syncGraph]);
 
   useEffect(() => {
+    // Route hydration intentionally initializes the independent editor states.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadFlow();
   }, [loadFlow]);
 
@@ -295,6 +309,8 @@ export function FlowEditorPage() {
     if (!catalog || !activeSimulation) return;
     // Do not depend on selectedId here: rewriting nodes on selection would
     // fight React Flow and can trigger maximum update depth errors.
+    // React Flow nodes are an external projection of the domain flow state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     syncGraph(flow, {
       tracedNodes: highlight.tracedNodes,
       dimmedNodes: highlight.dimmedNodes,
@@ -309,6 +325,12 @@ export function FlowEditorPage() {
     highlight.tracedNodes,
     syncGraph,
   ]);
+
+  useEffect(() => {
+    if (recentSimulationAt == null) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, [recentSimulationAt]);
 
   const updateNode = (
     patch: Partial<FlowNodeDefinition>,
@@ -669,6 +691,10 @@ export function FlowEditorPage() {
     const previous = history.current.pop();
     if (!previous) return;
     future.current.push(cloneFlow(flow));
+    setHistoryAvailability({
+      canUndo: history.current.length > 0,
+      canRedo: true,
+    });
     setFlow(previous);
     syncGraph(previous);
     setDirty(true);
@@ -678,6 +704,10 @@ export function FlowEditorPage() {
     const next = future.current.pop();
     if (!next) return;
     history.current.push(cloneFlow(flow));
+    setHistoryAvailability({
+      canUndo: true,
+      canRedo: future.current.length > 0,
+    });
     setFlow(next);
     syncGraph(next);
     setDirty(true);
@@ -712,7 +742,7 @@ export function FlowEditorPage() {
   }, [flow]);
 
   const hasRecentSimulation =
-    recentSimulationAt != null && Date.now() - recentSimulationAt < 30 * 60_000;
+    recentSimulationAt != null && clock - recentSimulationAt < 30 * 60_000;
 
   const runEnabled = canRunNow({
     role,
@@ -757,8 +787,8 @@ export function FlowEditorPage() {
         canValidate={canValidate(role)}
         canSimulate={canSimulate(role) && !dirty}
         canRun={runEnabled}
-        canUndo={history.current.length > 0}
-        canRedo={future.current.length > 0}
+        canUndo={historyAvailability.canUndo}
+        canRedo={historyAvailability.canRedo}
         triggerStatusLine={triggerCriteria?.statusLine}
         triggerTypesLine={triggerCriteria?.typesLine}
         onBack={() => void goBack()}

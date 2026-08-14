@@ -1,0 +1,14 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --build-arg
+      - VITE_EXTRACTOR_ML_API_URL=${_VITE_EXTRACTOR_ML_API_URL}
+      - --tag
+      - ${_IMAGE}
+      - .
+images:
+  - ${_IMAGE}
+substitutions:
+  _VITE_EXTRACTOR_ML_API_URL: ""
+  _IMAGE: europe-west1-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/extractor-ml-dispatcher-frontend:latest

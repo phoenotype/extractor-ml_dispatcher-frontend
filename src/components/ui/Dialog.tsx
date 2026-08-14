@@ -18,17 +18,18 @@ export function Dialog({
   wide,
 }: DialogProps) {
   return (
-    <div
-      className="modal-backdrop"
-      role="presentation"
-      onMouseDown={onClose}
-    >
+    <div className="modal-backdrop">
+      <button
+        type="button"
+        className="modal-dismiss"
+        aria-label="Chiudi finestra"
+        onClick={onClose}
+      />
       <div
         className={`modal ${wide ? "modal-wide" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
-        onMouseDown={(event) => event.stopPropagation()}
       >
         {icon ? <div className="modal-icon">{icon}</div> : null}
         <h2 id="dialog-title">{title}</h2>

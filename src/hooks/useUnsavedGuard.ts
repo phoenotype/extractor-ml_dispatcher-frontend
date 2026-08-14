@@ -6,7 +6,7 @@ import { useBlocker } from "react-router-dom";
  * Richiede un data router (createBrowserRouter + RouterProvider).
  */
 export function useUnsavedGuard(dirty: boolean) {
-  const [pendingLeave, setPendingLeave] = useState(false);
+  const [requestedLeave, setRequestedLeave] = useState(false);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
   useEffect(() => {
@@ -22,21 +22,17 @@ export function useUnsavedGuard(dirty: boolean) {
   const shouldBlock = dirty;
   const blocker = useBlocker(shouldBlock);
 
-  useEffect(() => {
-    if (blocker.state === "blocked") {
-      setPendingLeave(true);
-    }
-  }, [blocker.state]);
+  const pendingLeave = requestedLeave || blocker.state === "blocked";
 
   const confirmLeave = useCallback(() => {
-    setPendingLeave(false);
+    setRequestedLeave(false);
     resolver.current?.(true);
     resolver.current = null;
     if (blocker.state === "blocked") blocker.proceed();
   }, [blocker]);
 
   const cancelLeave = useCallback(() => {
-    setPendingLeave(false);
+    setRequestedLeave(false);
     resolver.current?.(false);
     resolver.current = null;
     if (blocker.state === "blocked") blocker.reset();
@@ -44,7 +40,7 @@ export function useUnsavedGuard(dirty: boolean) {
 
   const requestLeave = useCallback(() => {
     if (!dirty) return Promise.resolve(true);
-    setPendingLeave(true);
+    setRequestedLeave(true);
     return new Promise<boolean>((resolve) => {
       resolver.current = resolve;
     });

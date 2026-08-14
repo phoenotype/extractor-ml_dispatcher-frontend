@@ -46,7 +46,10 @@ export function FlowListPage() {
   );
   const [notice, setNotice] = useState<string | null>(null);
 
-  const items = flowsQuery.data?.data ?? [];
+  const items = useMemo(
+    () => flowsQuery.data?.data ?? [],
+    [flowsQuery.data?.data],
+  );
   const documentTypes = useMemo(
     () =>
       Array.from(

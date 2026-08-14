@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, LogIn } from "lucide-react";
 import {
   clearLucySession,
@@ -125,10 +125,6 @@ export function useLucyAuth() {
   const [session, setSession] = useState<LucyAuthSession | null>(() =>
     getLucySession(),
   );
-
-  useEffect(() => {
-    setSession(getLucySession());
-  }, []);
 
   return {
     session,

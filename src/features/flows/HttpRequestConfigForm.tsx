@@ -22,7 +22,10 @@ export function HttpRequestConfigForm({
   onChange,
 }: HttpRequestConfigFormProps) {
   const connectionsQuery = useConnectionsQuery();
-  const connections = connectionsQuery.data?.data ?? [];
+  const connections = useMemo(
+    () => connectionsQuery.data?.data ?? [],
+    [connectionsQuery.data?.data],
+  );
 
   const selected = useMemo(
     () =>
@@ -261,5 +264,3 @@ function SuccessStatusCodesField({
     </fieldset>
   );
 }
-
-export type { HttpConnection };
