@@ -8,6 +8,9 @@ import type { Role } from "@/types/flow";
 import type { ReactNode } from "react";
 
 const ROLES: Role[] = ["viewer", "editor", "operator"];
+const ENVIRONMENT_LABEL =
+  import.meta.env.VITE_ENVIRONMENT_LABEL ||
+  (import.meta.env.DEV ? "Locale" : "Produzione");
 
 interface AppShellProps {
   children: ReactNode;
@@ -40,7 +43,7 @@ export function AppShell({
         <div className="header-actions">
           <span className="environment">
             <i />
-            Locale
+            {ENVIRONMENT_LABEL}
           </span>
 
           <label className="sr-only" htmlFor="role-select">
