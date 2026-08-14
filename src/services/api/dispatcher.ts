@@ -47,6 +47,18 @@ function encodeName(name: string): string {
   return encodeURIComponent(name);
 }
 
+export function simulationRequestPayload(
+  flowName: string,
+  body: SimulationRequest,
+): SimulationRequest {
+  return {
+    flowName: body.flowName || flowName,
+    protocol: body.protocol,
+    batchSize: body.batchSize,
+    executeHttp: body.executeHttp === true,
+  };
+}
+
 function isVisualDefinition(
   value: unknown,
 ): value is { schemaVersion: 1; nodes: unknown[] } {
@@ -600,11 +612,7 @@ const liveApi: DispatcherApi = {
       `/flows/${encodeName(flowName)}/simulations`,
       {
         method: "POST",
-        body: JSON.stringify({
-          flowName: body.flowName || flowName,
-          protocol: body.protocol,
-          batchSize: body.batchSize,
-        }),
+        body: JSON.stringify(simulationRequestPayload(flowName, body)),
       },
     );
     return {

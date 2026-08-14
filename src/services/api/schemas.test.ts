@@ -5,7 +5,10 @@ import {
   httpConnectionSchema,
   simulationResultSchema,
 } from "@/services/api/schemas";
-import { normalizeFlowList } from "@/services/api/dispatcher";
+import {
+  normalizeFlowList,
+  simulationRequestPayload,
+} from "@/services/api/dispatcher";
 
 describe("flow list schemas", () => {
   it("parsa payload con items e flowName", () => {
@@ -61,6 +64,22 @@ describe("flow list schemas", () => {
 });
 
 describe("simulation result schema", () => {
+  it("invia executeHttp true quando richiesto dalla checkbox", () => {
+    expect(
+      simulationRequestPayload("testhttp", {
+        flowName: "testhttp",
+        protocol: 3141,
+        batchSize: 1,
+        executeHttp: true,
+      }),
+    ).toEqual({
+      flowName: "testhttp",
+      protocol: 3141,
+      batchSize: 1,
+      executeHttp: true,
+    });
+  });
+
   it("accetta una simulazione fermata dal trigger senza mutazioni", () => {
     const parsed = simulationResultSchema.parse({
       flowName: "invoice_opt_in_archive",
