@@ -75,6 +75,17 @@ export interface TraceStepDetails {
   checks?: TraceCheck[];
   failedCriteria?: string[];
   reason?: string;
+  httpExecution?: HttpExecution;
+  [key: string]: unknown;
+}
+
+export interface HttpExecution {
+  status: "completed" | "failed" | string;
+  statusCode?: number;
+  error?: string;
+  durationMs?: number;
+  request?: Record<string, unknown>;
+  response?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -117,6 +128,8 @@ export interface SimulationDocument {
   databaseWrites?: number;
   plannedExternalRequests?: number;
   externalRequests?: ExternalRequestResult[];
+  externalCallsAttempted?: number;
+  externalCallsSucceeded?: number;
 }
 
 export interface SimulationResult extends SimulationDocument {
@@ -124,6 +137,9 @@ export interface SimulationResult extends SimulationDocument {
   simulation?: boolean;
   documents?: SimulationDocument[];
   count?: number;
+  status?: string;
+  externalCallsAttempted?: number;
+  externalCallsSucceeded?: number;
 }
 
 export interface SimulationRequest {

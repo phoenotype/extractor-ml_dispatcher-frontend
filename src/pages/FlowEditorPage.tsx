@@ -566,11 +566,20 @@ export function FlowEditorPage() {
           executeHttp: executeSimulationHttp,
         },
       });
-      const docs = Array.isArray(result.data.documents)
+      const rawDocs = Array.isArray(result.data.documents)
         ? result.data.documents
         : result.data.trace
           ? [result.data]
           : [];
+      const docs = rawDocs.map((document) => ({
+        ...document,
+        databaseWrites:
+          document.databaseWrites ?? result.data.databaseWrites,
+        externalCallsAttempted:
+          document.externalCallsAttempted ?? result.data.externalCallsAttempted,
+        externalCallsSucceeded:
+          document.externalCallsSucceeded ?? result.data.externalCallsSucceeded,
+      }));
       const count =
         typeof result.data.count === "number" ? result.data.count : docs.length;
       setSimulationDocs(docs);

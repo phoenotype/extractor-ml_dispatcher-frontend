@@ -1964,6 +1964,91 @@ html[data-theme="dark"] .field-path-selected {
   gap: 6px;
 }
 
+.simulation-result-detailed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.simulation-outcome-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detailed-trace {
+  display: grid;
+  gap: 10px;
+}
+
+.detailed-trace > b {
+  font-size: 12px;
+}
+
+.detailed-trace .trace-node-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid #8b96a0;
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--surface, #fff);
+}
+
+.detailed-trace .trace-node-card.http-completed { border-left-color: #16845b; }
+.detailed-trace .trace-node-card.http-failed { border-left-color: #c13d3d; }
+.detailed-trace .trace-node-card.http-planned { border-left-color: #d39a19; }
+.detailed-trace .trace-node-card.is-skipped { opacity: 0.72; }
+
+.detailed-trace .trace-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.detailed-trace .trace-step > i {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #dfe9ea;
+  color: #247079;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.detailed-trace .trace-step > span {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.detailed-trace .trace-step strong { font-size: 12px; }
+.detailed-trace .trace-step small { color: #687580; font-size: 10px; }
+.detailed-trace .trace-step > em {
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.detailed-trace em.http-completed,
+.sim-alert.success {
+  background: #e8f7ef;
+  border-color: #addfc5;
+  color: #116a48;
+}
+.detailed-trace em.http-failed,
+.sim-alert.error {
+  background: #fff0f0;
+  border-color: #efb7b7;
+  color: #a52d2d;
+}
+.detailed-trace em.http-planned {
+  background: #fff7df;
+  color: #8a6100;
+}
+
 .trace-io {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1993,7 +2078,8 @@ html[data-theme="dark"] .field-path-selected {
 }
 
 @media (max-width: 800px) {
-  .trace-io { grid-template-columns: 1fr; }
+  .trace-io,
+  .simulation-outcome-grid { grid-template-columns: 1fr; }
 }
 .modal-actions {
   display: flex;

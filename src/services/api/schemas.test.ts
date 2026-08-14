@@ -103,6 +103,51 @@ describe("simulation result schema", () => {
     expect(parsed.documents?.[0].plannedMutations).toEqual({});
     expect(parsed.documents?.[0].stopped).toBe(true);
   });
+
+  it("mantiene traccia HTTP dettagliata e contatori esterni", () => {
+    const parsed = simulationResultSchema.parse({
+      simulation: true,
+      status: "evaluated",
+      externalCallsAttempted: 1,
+      externalCallsSucceeded: 1,
+      documents: [
+        {
+          protocol: 3141,
+          externalRequests: [
+            {
+              nodeId: "send",
+              connectionRef: "ifttt_dispatcher",
+              method: "POST",
+              path: "/",
+              status: "completed",
+            },
+          ],
+          trace: [
+            {
+              nodeId: "send",
+              nodeType: "action.http_request",
+              status: "executed",
+              input: { protocol: 3141 },
+              output: { ignored: true },
+              details: {
+                httpExecution: {
+                  status: "completed",
+                  statusCode: 200,
+                  request: { method: "POST", url: "https://masked/***" },
+                  response: { statusCode: 200, body: "ok" },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(parsed.externalCallsAttempted).toBe(1);
+    expect(parsed.documents?.[0].trace?.[0].details).toEqual(
+      expect.objectContaining({ httpExecution: expect.any(Object) }),
+    );
+  });
 });
 
 describe("HTTP connection schema", () => {

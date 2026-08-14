@@ -107,6 +107,21 @@ export const validationResultSchema = z.object({
   issues: z.array(validationIssueSchema).optional(),
 });
 
+const externalRequestResultSchema = z
+  .object({
+    nodeId: z.string(),
+    connectionRef: z.string(),
+    method: z.string(),
+    path: z.string(),
+    status: z.enum(["completed", "failed"]),
+    statusCode: z.number().optional(),
+    error: z.string().optional(),
+    durationMs: z.number().optional(),
+    request: z.record(z.string(), z.unknown()).optional(),
+    response: z.record(z.string(), z.unknown()).nullable().optional(),
+  })
+  .passthrough();
+
 export const simulationDocumentSchema = z
   .object({
     protocol: z.number().optional(),
@@ -122,6 +137,10 @@ export const simulationDocumentSchema = z
     stopped: z.boolean().optional(),
     stopReason: z.string().optional(),
     databaseWrites: z.number().optional(),
+    plannedExternalRequests: z.number().optional(),
+    externalRequests: z.array(externalRequestResultSchema).optional(),
+    externalCallsAttempted: z.number().optional(),
+    externalCallsSucceeded: z.number().optional(),
   })
   .passthrough();
 
@@ -130,6 +149,9 @@ export const simulationResultSchema = simulationDocumentSchema.extend({
   simulation: z.boolean().optional(),
   documents: z.array(simulationDocumentSchema).optional(),
   count: z.number().optional(),
+  status: z.string().optional(),
+  externalCallsAttempted: z.number().optional(),
+  externalCallsSucceeded: z.number().optional(),
 });
 
 export const catalogConfigFieldSchema = z
