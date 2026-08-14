@@ -6,6 +6,7 @@ import {
   pathLooksSensitive,
   normalizeConnection,
   sanitizeHttpRequestConfig,
+  validateConnectionDraft,
   validateHttpRequestConfig,
 } from "@/features/connections/http-config";
 import { ApiError } from "@/services/api/client";
@@ -174,6 +175,22 @@ describe("connectionRef e path HTTP", () => {
     expect(pathLooksSensitive("/hooks/key/abc123")).toBe(true);
     expect(pathLooksSensitive("/ok?token=xyz")).toBe(true);
     expect(pathLooksSensitive("/webhooks/ifttt")).toBe(false);
+  });
+
+  it("rifiuta credenziali incorporate nel baseUrl", () => {
+    const issues = validateConnectionDraft({
+      connectionName: "unsafe_webhook",
+      baseUrl: "https://example.com/hook/key/secret-value",
+      authType: "none",
+      authConfig: {},
+      defaultHeaders: {},
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+      timeoutSeconds: 20,
+      isActive: true,
+    });
+
+    expect(issues.some((message) => /baseUrl.*segreti/i.test(message))).toBe(true);
   });
 });
 

@@ -116,7 +116,7 @@ export function ConnectionsPage() {
       authConfig: buildAuthConfig(draft.authType, draft.authConfig),
     };
 
-    if (false && pathLooksSensitive(next.baseUrl || "")) {
+    if (urlMode === "baseUrl" && next.baseUrl && pathLooksSensitive(next.baseUrl)) {
       setFormError(
         "L'URL sembra contenere segreti (/key/, token, api_key…). Usa baseUrlEnv.",
       );
@@ -137,11 +137,7 @@ export function ConnectionsPage() {
         );
         return;
       }
-      setNotice(
-        urlMode === "baseUrl" && next.baseUrl && pathLooksSensitive(next.baseUrl)
-          ? "Connessione salvata. L'URL contiene una credenziale: limita i permessi di modifica."
-          : "Connessione salvata",
-      );
+      setNotice("Connessione salvata");
       setDraft(null);
     } catch (error) {
       setFormError(
@@ -338,12 +334,6 @@ export function ConnectionsPage() {
                       }
                       placeholder="https://api.example.com"
                     />
-                    {draft.baseUrl && pathLooksSensitive(draft.baseUrl) ? (
-                      <small className="field-hint">
-                        Questo URL contiene probabilmente una credenziale. Verrà salvato
-                        nel database e sarà utilizzabile immediatamente, senza deploy.
-                      </small>
-                    ) : null}
                   </label>
                 )}
               </fieldset>
