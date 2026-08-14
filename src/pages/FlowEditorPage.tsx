@@ -115,6 +115,7 @@ export function FlowEditorPage() {
   const [conflictRemote, setConflictRemote] = useState<FlowDetail | null>(null);
   const [protocol, setProtocol] = useState("");
   const [batchSize, setBatchSize] = useState(1);
+  const [executeSimulationHttp, setExecuteSimulationHttp] = useState(false);
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
   const history = useRef<FlowDefinition[]>([]);
@@ -547,7 +548,7 @@ export function FlowEditorPage() {
   const doSimulate = async () => {
     if (dirty) {
       setNotice(
-        "Salva prima il JSON: la simulazione usa sempre il flusso salvato nel database e non invia chiamate HTTP reali.",
+        "Salva prima il JSON: la simulazione usa sempre il flusso salvato nel database.",
       );
       return;
     }
@@ -562,6 +563,7 @@ export function FlowEditorPage() {
           flowName: flow.flowName,
           protocol: protocol ? Number(protocol) : undefined,
           batchSize,
+          executeHttp: executeSimulationHttp,
         },
       });
       const docs = Array.isArray(result.data.documents)
@@ -926,9 +928,11 @@ export function FlowEditorPage() {
         open={showSimModal}
         protocol={protocol}
         batchSize={batchSize}
+        executeHttp={executeSimulationHttp}
         busy={busy === "simulate"}
         onProtocolChange={setProtocol}
         onBatchSizeChange={setBatchSize}
+        onExecuteHttpChange={setExecuteSimulationHttp}
         onClose={() => setShowSimModal(false)}
         onSubmit={() => void doSimulate()}
       />

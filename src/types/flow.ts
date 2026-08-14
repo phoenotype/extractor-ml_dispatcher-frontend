@@ -78,6 +78,16 @@ export interface TraceStepDetails {
   [key: string]: unknown;
 }
 
+export interface ExternalRequestResult {
+  nodeId: string;
+  connectionRef: string;
+  method: string;
+  path: string;
+  status: "completed" | "failed";
+  statusCode?: number;
+  error?: string;
+}
+
 export interface TraceStep {
   nodeId?: string;
   node?: string;
@@ -100,6 +110,8 @@ export interface SimulationDocument {
   stopped?: boolean;
   stopReason?: string;
   databaseWrites?: number;
+  plannedExternalRequests?: number;
+  externalRequests?: ExternalRequestResult[];
 }
 
 export interface SimulationResult extends SimulationDocument {
@@ -113,6 +125,7 @@ export interface SimulationRequest {
   flowName: string;
   protocol?: number;
   batchSize?: number;
+  executeHttp?: boolean;
 }
 
 export interface RunRequest {

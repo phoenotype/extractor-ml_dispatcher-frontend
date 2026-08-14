@@ -294,6 +294,12 @@ export function SimulationTraceView({
                 {stepResultLabel(step) ? (
                   <small>Esito: {stepResultLabel(step)}</small>
                 ) : null}
+                {step.details?.httpExecution &&
+                typeof step.details.httpExecution === "object" ? (
+                  <small>
+                    HTTP: {formatValue(step.details.httpExecution)}
+                  </small>
+                ) : null}
               </span>
               {step.branch ? (
                 <em className={String(step.branch)}>{String(step.branch)}</em>
