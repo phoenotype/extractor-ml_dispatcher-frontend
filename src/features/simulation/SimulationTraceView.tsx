@@ -176,6 +176,13 @@ export function SimulationTraceView({
   const triggerFailed = isTriggerFailed(document);
   const stop = stopMessage(document);
   const mutations = asMutationList(document.plannedMutations);
+  const externalRequests = document.externalRequests || [];
+  const failedExternalRequests = externalRequests.filter(
+    (request) => request.status === "failed",
+  );
+  const completedExternalRequests = externalRequests.filter(
+    (request) => request.status === "completed",
+  );
   const executed = (document.trace || []).filter(
     (step) => !step.status || step.status === "executed",
   );
@@ -250,6 +257,42 @@ export function SimulationTraceView({
           <div>
             <b>Perché si è fermata</b>
             <small>{stop}</small>
+          </div>
+        </div>
+      ) : null}
+
+      {failedExternalRequests.length > 0 ? (
+        <div className="sim-alert warn">
+          <XCircle size={18} />
+          <div>
+            <b>Chiamata HTTP non eseguita correttamente</b>
+            {failedExternalRequests.map((request) => (
+              <small key={request.nodeId}>
+                {request.nodeId}: {request.error || "errore non specificato"}
+              </small>
+            ))}
+          </div>
+        </div>
+      ) : completedExternalRequests.length > 0 ? (
+        <div className="sim-alert info">
+          <CheckCircle2 size={18} />
+          <div>
+            <b>Chiamata HTTP inviata realmente</b>
+            {completedExternalRequests.map((request) => (
+              <small key={request.nodeId}>
+                {request.nodeId}: HTTP {request.statusCode ?? "2xx"}
+              </small>
+            ))}
+          </div>
+        </div>
+      ) : document.plannedExternalRequests ? (
+        <div className="sim-alert warn">
+          <AlertTriangle size={18} />
+          <div>
+            <b>HTTP soltanto pianificato</b>
+            <small>
+              Il flusso ha raggiunto un nodo HTTP, ma non risulta alcuna chiamata reale.
+            </small>
           </div>
         </div>
       ) : null}
