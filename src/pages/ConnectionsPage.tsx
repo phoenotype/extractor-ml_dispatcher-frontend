@@ -50,7 +50,7 @@ export function ConnectionsPage() {
 
   const [draft, setDraft] = useState<HttpConnection | null>(null);
   const [nameLocked, setNameLocked] = useState(false);
-  const [urlMode, setUrlMode] = useState<"baseUrl" | "baseUrlEnv">("baseUrlEnv");
+  const [urlMode, setUrlMode] = useState<"baseUrl" | "baseUrlEnv">("baseUrl");
   const [headersDraft, setHeadersDraft] = useState("{}");
   const [prefixesDraft, setPrefixesDraft] = useState("/");
   const [formError, setFormError] = useState<string | null>(null);
@@ -68,7 +68,7 @@ export function ConnectionsPage() {
   const openCreate = () => {
     setDraft(emptyDraft());
     setNameLocked(false);
-    setUrlMode("baseUrlEnv");
+    setUrlMode("baseUrl");
     setHeadersDraft("{}");
     setPrefixesDraft("/");
     setFormError(null);
@@ -116,7 +116,7 @@ export function ConnectionsPage() {
       authConfig: buildAuthConfig(draft.authType, draft.authConfig),
     };
 
-    if (urlMode === "baseUrl" && next.baseUrl && pathLooksSensitive(next.baseUrl)) {
+    if (false && pathLooksSensitive(next.baseUrl || "")) {
       setFormError(
         "L'URL sembra contenere segreti (/key/, token, api_key…). Usa baseUrlEnv.",
       );
@@ -130,8 +130,18 @@ export function ConnectionsPage() {
     }
 
     try {
-      await upsertConnection.mutateAsync(normalizeConnection(next));
-      setNotice("Connessione salvata");
+      const saved = await upsertConnection.mutateAsync(normalizeConnection(next));
+      if (urlMode === "baseUrl" && !saved.baseUrl) {
+        setFormError(
+          "Il backend non ha salvato l'URL esplicito. La connessione non è stata aggiornata.",
+        );
+        return;
+      }
+      setNotice(
+        urlMode === "baseUrl" && next.baseUrl && pathLooksSensitive(next.baseUrl)
+          ? "Connessione salvata. L'URL contiene una credenziale: limita i permessi di modifica."
+          : "Connessione salvata",
+      );
       setDraft(null);
     } catch (error) {
       setFormError(
@@ -328,6 +338,12 @@ export function ConnectionsPage() {
                       }
                       placeholder="https://api.example.com"
                     />
+                    {draft.baseUrl && pathLooksSensitive(draft.baseUrl) ? (
+                      <small className="field-hint">
+                        Questo URL contiene probabilmente una credenziale. Verrà salvato
+                        nel database e sarà utilizzabile immediatamente, senza deploy.
+                      </small>
+                    ) : null}
                   </label>
                 )}
               </fieldset>

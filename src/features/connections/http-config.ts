@@ -168,12 +168,6 @@ export function validateConnectionDraft(
   if (hasUrl && looksLikeAbsoluteUrl(String(draft.baseUrl)) === false) {
     issues.push("baseUrl deve essere un URL assoluto https:// o http://");
   }
-  if (hasUrl && pathLooksSensitive(String(draft.baseUrl))) {
-    issues.push(
-      "baseUrl sembra contenere segreti: preferisci baseUrlEnv",
-    );
-  }
-
   for (const prefix of draft.allowedPathPrefixes || []) {
     if (pathLooksSensitive(prefix)) {
       issues.push(
