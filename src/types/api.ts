@@ -1,4 +1,5 @@
 import type { Catalog } from "./catalog";
+import type { HttpConnection } from "./connection";
 import type {
   FlowDefinition,
   FlowDetail,
@@ -51,6 +52,12 @@ export interface DispatcherApi {
   createFlow(body: CreateFlowBody): Promise<FlowDetail>;
   updateFlow(flowName: string, body: UpdateFlowBody): Promise<FlowDetail>;
   deactivateFlow(flowName: string): Promise<void>;
+  listConnections(): Promise<ApiResult<HttpConnection[]>>;
+  getConnection(connectionName: string): Promise<HttpConnection>;
+  upsertConnection(
+    connectionName: string,
+    body: HttpConnection,
+  ): Promise<HttpConnection>;
   validate(body: ValidateFlowBody): Promise<ValidationResult>;
   validateFlow(
     flowName: string,

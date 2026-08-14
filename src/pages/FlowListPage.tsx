@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AlertTriangle, Database, Plus, RefreshCw } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/Button";
@@ -194,9 +194,10 @@ export function FlowListPage() {
   return (
     <AppShell>
       <nav className="app-tabs" aria-label="Sezioni">
-        <button type="button" className="active">
+        <Link to="/" className="active" aria-current="page">
           Dispatcher
-        </button>
+        </Link>
+        <Link to="/connections">Connessioni HTTP</Link>
       </nav>
       <section className="list-content">
         <div className="hero-row">

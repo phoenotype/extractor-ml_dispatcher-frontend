@@ -6,6 +6,7 @@ import type {
   ValidateFlowBody,
 } from "@/types/api";
 import type { Catalog } from "@/types/catalog";
+import type { HttpConnection } from "@/types/connection";
 import type {
   FlowDetail,
   FlowListItem,
@@ -15,11 +16,13 @@ import type {
   SimulationResult,
   ValidationResult,
 } from "@/types/flow";
+import { validateHttpRequestConfig } from "@/features/connections/http-config";
 import { ApiError, assertOk } from "./client";
 import { getDispatcherConfig } from "./config";
 import { dispatcherFetch } from "./http";
 import {
   mockCatalog,
+  mockConnections,
   mockFlowDetails,
   mockFlowItems,
   mockSimulation,
@@ -30,6 +33,8 @@ import {
   catalogSchema,
   flowListItemSchema,
   flowListPayloadSchema,
+  httpConnectionListPayloadSchema,
+  httpConnectionSchema,
   simulationResultSchema,
   validationResultSchema,
 } from "./schemas";
@@ -159,27 +164,60 @@ async function requestJson(
   return assertOk(response);
 }
 
-function toValidationResult(error: unknown): ValidationResult | null {
+export function toValidationResult(error: unknown): ValidationResult | null {
   if (!(error instanceof ApiError) || !error.isValidation) return null;
-  const details = Array.isArray(error.details) ? error.details : [];
+
+  const details = error.details;
+  const toIssue = (message: string, nodeId?: string) => ({
+    message,
+    nodeId:
+      nodeId ||
+      /nodes\.([^.]+)|Node\s+([^\s:]+)/i.exec(message)?.[1] ||
+      /Node\s+([^\s:]+)/i.exec(message)?.[2],
+  });
+
+  if (typeof details === "string") {
+    return { valid: false, issues: [toIssue(details)] };
+  }
+
+  if (Array.isArray(details) && details.length > 0) {
+    return {
+      valid: false,
+      issues: details.map((item) => {
+        if (typeof item === "string") return toIssue(item);
+        if (item && typeof item === "object") {
+          const record = item as {
+            msg?: string;
+            message?: string;
+            nodeId?: string;
+            loc?: unknown;
+          };
+          const message =
+            record.msg || record.message || error.message || "Definizione non valida";
+          return toIssue(message, record.nodeId);
+        }
+        return toIssue("Definizione non valida");
+      }),
+    };
+  }
+
   return {
     valid: false,
-    issues: details.map((item) => {
-      const msg =
-        item && typeof item === "object" && "msg" in item
-          ? String((item as { msg?: string }).msg || "Definizione non valida")
-          : "Definizione non valida";
-      return {
-        message: msg,
-        nodeId: /Node ([^ ]+)/.exec(msg)?.[1],
-      };
-    }),
+    issues: [toIssue(error.message || "Definizione non valida")],
   };
+}
+
+export function normalizeConnections(payload: unknown): HttpConnection[] {
+  const parsed = httpConnectionListPayloadSchema.parse(payload);
+  if (Array.isArray(parsed)) return parsed;
+  if ("items" in parsed) return parsed.items;
+  return parsed.connections;
 }
 
 const mockStore = {
   items: structuredClone(mockFlowItems),
   details: structuredClone(mockFlowDetails) as Record<string, FlowDetail>,
+  connections: structuredClone(mockConnections) as HttpConnection[],
 };
 
 const mockApi: DispatcherApi = {
@@ -277,12 +315,60 @@ const mockApi: DispatcherApi = {
     );
   },
 
+  async listConnections(): Promise<ApiResult<HttpConnection[]>> {
+    await delay();
+    return { data: structuredClone(mockStore.connections), source: "mock" };
+  },
+
+  async getConnection(connectionName: string): Promise<HttpConnection> {
+    await delay();
+    const found = mockStore.connections.find(
+      (item) => item.connectionName === connectionName,
+    );
+    if (!found) {
+      throw new ApiError(404, `Connessione non trovata: ${connectionName}`);
+    }
+    return structuredClone(found);
+  },
+
+  async upsertConnection(
+    connectionName: string,
+    body: HttpConnection,
+  ): Promise<HttpConnection> {
+    await delay();
+    const next = { ...body, connectionName };
+    const index = mockStore.connections.findIndex(
+      (item) => item.connectionName === connectionName,
+    );
+    if (index >= 0) mockStore.connections[index] = next;
+    else mockStore.connections.push(next);
+    return structuredClone(next);
+  },
+
   async validate(body: ValidateFlowBody): Promise<ValidationResult> {
     await delay();
     if (!body.flowDefinition.nodes.length) {
       return {
         valid: false,
         issues: [{ message: "Il flusso non contiene nodi" }],
+      };
+    }
+    const issues: ValidationResult["issues"] = [];
+    for (const node of body.flowDefinition.nodes) {
+      if (node.type !== "action.http_request") continue;
+      const messages = validateHttpRequestConfig(
+        node.config || {},
+        mockStore.connections,
+      );
+      for (const message of messages) {
+        issues.push({ nodeId: node.id, message });
+      }
+    }
+    if (issues.length) {
+      return {
+        valid: false,
+        flowName: body.flowDefinition.flowName,
+        issues,
       };
     }
     return {
@@ -382,6 +468,27 @@ const liveApi: DispatcherApi = {
 
   async deactivateFlow(flowName: string): Promise<void> {
     await requestJson(`/flows/${encodeName(flowName)}`, { method: "DELETE" });
+  },
+
+  async listConnections(): Promise<ApiResult<HttpConnection[]>> {
+    const body = await requestJson("/connections");
+    return { data: normalizeConnections(body), source: "api" };
+  },
+
+  async getConnection(connectionName: string): Promise<HttpConnection> {
+    const body = await requestJson(`/connections/${encodeName(connectionName)}`);
+    return httpConnectionSchema.parse(body);
+  },
+
+  async upsertConnection(
+    connectionName: string,
+    body: HttpConnection,
+  ): Promise<HttpConnection> {
+    const payload = await requestJson(`/connections/${encodeName(connectionName)}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...body, connectionName }),
+    });
+    return httpConnectionSchema.parse(payload);
   },
 
   async validate(body: ValidateFlowBody): Promise<ValidationResult> {

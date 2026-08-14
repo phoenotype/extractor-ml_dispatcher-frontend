@@ -46,13 +46,15 @@ import {
 } from "@/features/flows/permissions";
 import { useCatalogQuery } from "@/features/flows/useCatalogQuery";
 import { useFlowMutations } from "@/features/flows/useFlowMutations";
+import { useConnectionsQuery } from "@/features/connections/useConnectionsQuery";
+import { sanitizeHttpRequestConfig } from "@/features/connections/http-config";
 import { RunConfirmDialog } from "@/features/simulation/RunConfirmDialog";
 import { SimulationModal } from "@/features/simulation/SimulationModal";
 import { useSimulationHighlight } from "@/features/simulation/useSimulationHighlight";
 import { useRole } from "@/hooks/useRole";
 import { useUnsavedGuard } from "@/hooks/useUnsavedGuard";
 import { ApiError } from "@/services/api/client";
-import { dispatcherApi, starterFlow } from "@/services/api/dispatcher";
+import { dispatcherApi, starterFlow, toValidationResult } from "@/services/api/dispatcher";
 import type {
   FlowDefinition,
   FlowDetail,
@@ -67,7 +69,9 @@ export function FlowEditorPage() {
   const isNew = !routeName || routeName === "new";
   const { role } = useRole();
   const catalogQuery = useCatalogQuery();
+  const connectionsQuery = useConnectionsQuery();
   const mutations = useFlowMutations();
+  const connections = connectionsQuery.data?.data ?? [];
 
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<FlowDetail | null>(null);
@@ -328,7 +332,10 @@ export function FlowEditorPage() {
         if (value === undefined) delete merged[key];
         else merged[key] = value;
       }
-      target.config = merged;
+      target.config =
+        target.type === "action.http_request"
+          ? sanitizeHttpRequestConfig(merged)
+          : merged;
     }
     if (patch.id && patch.id !== previousId) {
       next.edges = next.edges.map((edge) => ({
@@ -435,40 +442,59 @@ export function FlowEditorPage() {
     setEdges((current) => addEdge(connection, current));
   };
 
-  const doValidate = async () => {
-    if (!catalog) return;
-    setBusy("validate");
+  const runValidation = async (
+    flowToValidate: FlowDefinition,
+  ): Promise<ValidationResult | null> => {
+    if (!catalog) return null;
     setBottomOpen(true);
     setBottomTab("validation");
-    const preliminary = preliminaryValidate(flow, catalog);
+    const preliminary = preliminaryValidate(
+      flowToValidate,
+      catalog,
+      connections,
+    );
     if (preliminary.length) {
       const result = { valid: false, issues: preliminary };
       setValidation(result);
-      syncGraph(flow, {
+      syncGraph(flowToValidate, {
         issues: new Set(
           preliminary.map((i) => i.nodeId).filter(Boolean) as string[],
         ),
       });
-      setBusy(null);
-      return;
+      return result;
     }
     try {
       const result = isNew
-        ? await mutations.validate.mutateAsync({ flowDefinition: flow })
+        ? await mutations.validate.mutateAsync({
+            flowDefinition: flowToValidate,
+          })
         : await mutations.validateFlow.mutateAsync({
-            flowName: flow.flowName,
-            body: { flowDefinition: flow },
+            flowName: flowToValidate.flowName,
+            body: { flowDefinition: flowToValidate },
           });
       setValidation(result);
-      syncGraph(flow, {
+      syncGraph(flowToValidate, {
         issues: new Set(
           (result.issues || [])
             .map((i) => i.nodeId)
             .filter(Boolean) as string[],
         ),
       });
+      return result;
     } catch (error) {
-      setValidation({
+      const from422 = toValidationResult(error);
+      if (from422) {
+        setValidation(from422);
+        syncGraph(flowToValidate, {
+          issues: new Set(
+            (from422.issues || [])
+              .map((i) => i.nodeId)
+              .filter(Boolean) as string[],
+          ),
+        });
+        return from422;
+      }
+      const result = {
         valid: false,
         issues: [
           {
@@ -478,7 +504,16 @@ export function FlowEditorPage() {
                 : "Backend non raggiungibile. Verifica l'URL configurato.",
           },
         ],
-      });
+      };
+      setValidation(result);
+      return result;
+    }
+  };
+
+  const doValidate = async () => {
+    setBusy("validate");
+    try {
+      await runValidation(flow);
     } finally {
       setBusy(null);
     }
@@ -487,7 +522,7 @@ export function FlowEditorPage() {
   const doSimulate = async () => {
     if (dirty) {
       setNotice(
-        "Salva prima il JSON: la simulazione usa sempre il flusso salvato nel database.",
+        "Salva prima il JSON: la simulazione usa sempre il flusso salvato nel database e non invia chiamate HTTP reali.",
       );
       return;
     }
@@ -525,40 +560,47 @@ export function FlowEditorPage() {
   };
 
   const save = async () => {
-    if (isActive && validation?.valid !== true) {
-      setNotice("Valida il flusso prima di salvarlo come attivo");
+    if (!catalog) {
+      setNotice("Catalogo non disponibile");
       return;
     }
+    const flowToSave = normalizeFlowDefinition(flow, flow.flowName);
     setBusy("save");
     try {
+      const validationResult = await runValidation(flowToSave);
+      if (!validationResult || validationResult.valid !== true) {
+        setNotice("Correggi gli errori di validazione prima di salvare");
+        return;
+      }
       if (isNew || !detail) {
         const created = await mutations.createFlow.mutateAsync({
-          flowName: flow.flowName,
+          flowName: flowToSave.flowName,
           description,
           documentType,
           isActive: false,
-          flowDefinition: flow,
+          flowDefinition: flowToSave,
           metadata,
         });
         setDetail(created);
         setExpectedUpdatedAt(
           created.expectedUpdatedAt || created.updatedAt || "",
         );
+        setFlow(flowToSave);
         setDirty(false);
-        localStorage.removeItem(`dispatcher-draft:${flow.flowName}`);
+        localStorage.removeItem(`dispatcher-draft:${flowToSave.flowName}`);
         setNotice("Flusso creato");
-        navigate(`/flows/${encodeURIComponent(flow.flowName)}`, {
+        navigate(`/flows/${encodeURIComponent(flowToSave.flowName)}`, {
           replace: true,
         });
       } else {
         const updated = await mutations.updateFlow.mutateAsync({
-          flowName: flow.flowName,
+          flowName: flowToSave.flowName,
           body: {
-            flowName: flow.flowName,
+            flowName: flowToSave.flowName,
             description,
             documentType,
             isActive,
-            flowDefinition: flow,
+            flowDefinition: flowToSave,
             metadata,
             expectedUpdatedAt,
           },
@@ -567,8 +609,9 @@ export function FlowEditorPage() {
         setExpectedUpdatedAt(
           updated.expectedUpdatedAt || updated.updatedAt || "",
         );
+        setFlow(flowToSave);
         setDirty(false);
-        localStorage.removeItem(`dispatcher-draft:${flow.flowName}`);
+        localStorage.removeItem(`dispatcher-draft:${flowToSave.flowName}`);
         setNotice("Flusso salvato");
       }
     } catch (error) {
@@ -579,6 +622,16 @@ export function FlowEditorPage() {
           setConflictRemote(remote);
         } catch {
           setConflictRemote(null);
+        }
+      } else if (error instanceof ApiError && error.isValidation) {
+        const from422 = toValidationResult(error);
+        if (from422) {
+          setValidation(from422);
+          setBottomOpen(true);
+          setBottomTab("validation");
+          setNotice("Correggi gli errori di validazione prima di salvare");
+        } else {
+          setNotice(error.message);
         }
       } else {
         setNotice(
@@ -790,6 +843,9 @@ export function FlowEditorPage() {
             node={selected}
             catalog={catalog}
             disabled={readOnly}
+            issues={(validation?.issues || []).filter(
+              (issue) => issue.nodeId && issue.nodeId === selected?.id,
+            )}
             onClose={() => setSelectedId(null)}
             onUpdate={updateNode}
             onDuplicate={duplicateNode}

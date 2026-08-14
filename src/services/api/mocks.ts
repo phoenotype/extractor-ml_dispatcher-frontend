@@ -1,4 +1,5 @@
 import type { Catalog } from "@/types/catalog";
+import type { HttpConnection } from "@/types/connection";
 import type {
   FlowDefinition,
   FlowDetail,
@@ -77,6 +78,55 @@ export const mockCatalog: Catalog = {
           required: true,
           source: "exportStatuses",
           label: "Nuovo stato",
+        },
+      },
+      outputs: ["always"],
+    },
+    {
+      type: "action.http_request",
+      category: "action",
+      label: "Richiesta HTTP",
+      description:
+        "Invia una richiesta HTTP tramite una connessione configurata (senza segreti nel flusso)",
+      configSchema: {
+        connectionRef: {
+          type: "string",
+          required: true,
+          label: "Connessione",
+          description: "Nome connessione HTTP attiva",
+        },
+        method: {
+          type: "enum",
+          values: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+          required: true,
+          label: "Metodo",
+        },
+        path: {
+          type: "string",
+          required: true,
+          label: "Percorso",
+          description: "Percorso relativo che inizia con /",
+        },
+        headers: {
+          type: "any",
+          required: false,
+          label: "Headers",
+        },
+        body: {
+          type: "any",
+          required: false,
+          label: "Body",
+        },
+        successStatusCodes: {
+          type: "array",
+          items: "number",
+          required: true,
+          label: "Status di successo",
+        },
+        timeoutSeconds: {
+          type: "number",
+          required: false,
+          label: "Timeout (secondi)",
         },
       },
       outputs: ["always"],
@@ -320,3 +370,42 @@ export const mockValidationOk: ValidationResult = {
   edges: starterFlow.edges.length,
   issues: [],
 };
+
+export const mockConnections: HttpConnection[] = [
+  {
+    connectionName: "ifttt_dispatcher",
+    baseUrlEnv: "IFTTT_WEBHOOK_BASE_URL",
+    authType: "none",
+    authConfig: {},
+    defaultHeaders: {},
+    allowedMethods: ["POST"],
+    allowedPathPrefixes: ["/"],
+    timeoutSeconds: 20,
+    isActive: true,
+  },
+  {
+    connectionName: "archive_api",
+    baseUrl: "https://api.example.com",
+    authType: "bearer_env",
+    authConfig: { tokenEnv: "EXTERNAL_API_TOKEN" },
+    defaultHeaders: { Accept: "application/json" },
+    allowedMethods: ["GET", "POST"],
+    allowedPathPrefixes: ["/v1/", "/webhooks/"],
+    timeoutSeconds: 30,
+    isActive: true,
+  },
+  {
+    connectionName: "legacy_inactive",
+    baseUrl: "https://legacy.example.com",
+    authType: "api_key_env",
+    authConfig: {
+      headerName: "X-API-Key",
+      valueEnv: "EXTERNAL_API_KEY",
+    },
+    defaultHeaders: {},
+    allowedMethods: ["GET"],
+    allowedPathPrefixes: ["/"],
+    timeoutSeconds: 15,
+    isActive: false,
+  },
+];

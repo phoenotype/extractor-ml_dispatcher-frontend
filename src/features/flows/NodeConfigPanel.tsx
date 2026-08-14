@@ -5,6 +5,8 @@ import {
   operatorsForDocumentField,
 } from "@/features/flows/catalog-fields";
 import { FieldPathPicker } from "@/features/flows/FieldPathPicker";
+import { HttpRequestConfigForm } from "@/features/flows/HttpRequestConfigForm";
+import { JsonConfigField } from "@/features/flows/JsonConfigField";
 import {
   catalogNode,
   ensureTriggerConfigSchema,
@@ -14,12 +16,13 @@ import {
   slug,
 } from "@/features/flows/flow-utils";
 import type { Catalog, CatalogConfigField } from "@/types/catalog";
-import type { FlowNodeDefinition } from "@/types/flow";
+import type { FlowNodeDefinition, ValidationIssue } from "@/types/flow";
 
 interface NodeConfigPanelProps {
   node: FlowNodeDefinition | null;
   catalog: Catalog;
   disabled?: boolean;
+  issues?: ValidationIssue[];
   onClose: () => void;
   onUpdate: (
     patch: Partial<FlowNodeDefinition>,
@@ -33,6 +36,7 @@ export function NodeConfigPanel({
   node,
   catalog,
   disabled,
+  issues = [],
   onClose,
   onUpdate,
   onDuplicate,
@@ -55,6 +59,7 @@ export function NodeConfigPanel({
           node={node}
           catalog={catalog}
           disabled={disabled}
+          issues={issues}
           onUpdate={onUpdate}
           onDuplicate={onDuplicate}
           onDelete={onDelete}
@@ -74,6 +79,7 @@ function DynamicNodeForm({
   node,
   catalog,
   disabled,
+  issues,
   onUpdate,
   onDuplicate,
   onDelete,
@@ -81,6 +87,7 @@ function DynamicNodeForm({
   node: FlowNodeDefinition;
   catalog: Catalog;
   disabled?: boolean;
+  issues: ValidationIssue[];
   onUpdate: (
     patch: Partial<FlowNodeDefinition>,
     config?: Record<string, unknown>,
@@ -91,6 +98,13 @@ function DynamicNodeForm({
   const definition = ensureTriggerConfigSchema(catalogNode(catalog, node.type));
   const visual = nodeVisual(definition);
   const Icon = visual.icon;
+
+  const replaceHttpConfig = (nextConfig: Record<string, unknown>) => {
+    const clears = Object.fromEntries(
+      Object.keys(node.config).map((key) => [key, undefined]),
+    );
+    onUpdate({}, { ...clears, ...nextConfig });
+  };
 
   return (
     <div className="node-form">
@@ -103,6 +117,13 @@ function DynamicNodeForm({
           <b>{node.type}</b>
         </div>
       </div>
+      {issues.length > 0 ? (
+        <div className="node-issues" role="alert">
+          {issues.map((issue, index) => (
+            <p key={`${issue.message}-${index}`}>{issue.message}</p>
+          ))}
+        </div>
+      ) : null}
       <label>
         Nome del nodo
         <input
@@ -119,19 +140,27 @@ function DynamicNodeForm({
           onChange={(event) => onUpdate({ id: slug(event.target.value) })}
         />
       </label>
-      {Object.entries(definition.configSchema).map(([key, field]) => (
-        <DynamicConfigField
-          key={`${node.id}:${key}`}
-          fieldKey={key}
-          field={field}
-          value={node.config[key]}
+      {node.type === "action.http_request" ? (
+        <HttpRequestConfigForm
           config={node.config}
-          catalog={catalog}
           disabled={disabled}
-          onChange={(value) => onUpdate({}, { [key]: value })}
-          onConfigPatch={(patch) => onUpdate({}, patch)}
+          onChange={replaceHttpConfig}
         />
-      ))}
+      ) : (
+        Object.entries(definition.configSchema).map(([key, field]) => (
+          <DynamicConfigField
+            key={`${node.id}:${key}`}
+            fieldKey={key}
+            field={field}
+            value={node.config[key]}
+            config={node.config}
+            catalog={catalog}
+            disabled={disabled}
+            onChange={(value) => onUpdate({}, { [key]: value })}
+            onConfigPatch={(patch) => onUpdate({}, patch)}
+          />
+        ))
+      )}
       {definition.outputs.length === 0 ? (
         <div className="stop-note">
           <Pause size={16} />
@@ -428,64 +457,6 @@ function DynamicConfigField({
           onChange(parseCatalogValue(event.target.value, field))
         }
       />
-    </label>
-  );
-}
-
-function JsonConfigField({
-  label,
-  value,
-  disabled,
-  requireObject,
-  onChange,
-}: {
-  label: string;
-  value: unknown;
-  disabled?: boolean;
-  requireObject?: boolean;
-  onChange: (value: unknown) => void;
-}) {
-  const [draft, setDraft] = useState(() =>
-    value === undefined ? "" : JSON.stringify(value, null, 2),
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  return (
-    <label>
-      {label} (JSON)
-      <textarea
-        disabled={disabled}
-        rows={7}
-        value={draft}
-        placeholder={label.toLowerCase() === "headers" ? '{\n  "X-Source": "dispatcher"\n}' : '{\n  "protocol": "{{ document.protocol }}"\n}'}
-        onChange={(event) => {
-          const next = event.target.value;
-          setDraft(next);
-          if (!next.trim()) {
-            setError(null);
-            onChange(undefined);
-            return;
-          }
-          try {
-            const parsed = JSON.parse(next);
-            if (
-              requireObject &&
-              (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-            ) {
-              setError("Inserisci un oggetto JSON");
-              return;
-            }
-            onChange(parsed);
-            setError(null);
-          } catch {
-            setError("JSON non valido");
-          }
-        }}
-      />
-      {error ? <small className="field-error">{error}</small> : null}
-      <small className="field-hint">
-        Puoi usare template come {"{{ document.protocol }}"}.
-      </small>
     </label>
   );
 }

@@ -17,7 +17,9 @@ export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) 
         ? `${String(def.config.field || "Campo")} · ${String(def.config.operator || "eq")}`
         : def.type === "action.update_export_status"
           ? `Nuovo stato: ${String(def.config.exportStatus ?? "—")}`
-          : "Nessuna modifica";
+          : def.type === "action.http_request"
+            ? `${String(def.config.method || "POST")} ${String(def.config.connectionRef || "—")}${String(def.config.path || "")}`
+            : "Nessuna modifica";
 
   return (
     <div

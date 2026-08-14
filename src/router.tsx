@@ -3,6 +3,7 @@ import {
   LoginScreen,
   useLucyAuth,
 } from "@/components/auth/LoginScreen";
+import { ConnectionsPage } from "@/pages/ConnectionsPage";
 import { FlowEditorPage } from "@/pages/FlowEditorPage";
 import { FlowListPage } from "@/pages/FlowListPage";
 import { getDispatcherConfig } from "@/services/api/config";
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
     element: <AuthLayout />,
     children: [
       { path: "/", element: <FlowListPage /> },
+      { path: "/connections", element: <ConnectionsPage /> },
       { path: "/flows/new", element: <FlowEditorPage /> },
       { path: "/flows/:flowName", element: <FlowEditorPage /> },
       { path: "*", element: <Navigate to="/" replace /> },

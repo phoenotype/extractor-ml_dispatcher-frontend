@@ -179,7 +179,36 @@ export const catalogSchema = z.object({
   ),
 });
 
+export const httpAuthTypeSchema = z.enum([
+  "none",
+  "bearer_env",
+  "api_key_env",
+  "basic_env",
+]);
+
+export const httpConnectionSchema = z
+  .object({
+    connectionName: z.string(),
+    baseUrl: z.string().optional(),
+    baseUrlEnv: z.string().optional(),
+    authType: httpAuthTypeSchema,
+    authConfig: z.record(z.string(), z.string()).optional().default({}),
+    defaultHeaders: z.record(z.string(), z.string()).optional().default({}),
+    allowedMethods: z.array(z.string()),
+    allowedPathPrefixes: z.array(z.string()),
+    timeoutSeconds: z.number(),
+    isActive: z.boolean(),
+  })
+  .passthrough();
+
+export const httpConnectionListPayloadSchema = z.union([
+  z.array(httpConnectionSchema),
+  z.object({ items: z.array(httpConnectionSchema) }),
+  z.object({ connections: z.array(httpConnectionSchema) }),
+]);
+
 export type FlowListItemParsed = z.infer<typeof flowListItemSchema>;
 export type CatalogParsed = z.infer<typeof catalogSchema>;
 export type ValidationResultParsed = z.infer<typeof validationResultSchema>;
 export type SimulationResultParsed = z.infer<typeof simulationResultSchema>;
+export type HttpConnectionParsed = z.infer<typeof httpConnectionSchema>;

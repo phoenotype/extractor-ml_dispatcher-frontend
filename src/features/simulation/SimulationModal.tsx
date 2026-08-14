@@ -27,7 +27,7 @@ export function SimulationModal({
   return (
     <Dialog
       title="Simula il flusso"
-      description="La simulazione usa il motore del backend in sola lettura. Non modifica il database."
+      description="La simulazione usa il motore del backend in sola lettura. Non modifica il database e non invia chiamate HTTP reali verso sistemi esterni."
       icon={<Play size={20} />}
       onClose={onClose}
     >
@@ -54,8 +54,10 @@ export function SimulationModal({
       <div className="safety">
         <Database size={17} />
         <div>
-          <b>Nessuna scrittura sul database</b>
-          <small>Vedrai soltanto il percorso e le modifiche pianificate.</small>
+          <b>Simulazione dry-run</b>
+          <small>
+            Nessuna scrittura sul database e nessuna richiesta HTTP reale.
+          </small>
         </div>
       </div>
       <div className="modal-actions">

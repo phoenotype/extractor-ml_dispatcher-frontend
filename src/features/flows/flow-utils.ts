@@ -1,10 +1,12 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { Catalog, CatalogConfigField, CatalogNodeType } from "@/types/catalog";
+import type { HttpConnection } from "@/types/connection";
 import type {
   FlowDefinition,
   FlowNodeDefinition,
   ValidationIssue,
 } from "@/types/flow";
+import { sanitizeHttpRequestConfig, validateHttpRequestConfig } from "@/features/connections/http-config";
 import {
   CircleStop,
   GitBranch,
@@ -106,6 +108,16 @@ export function normalizeFlowDefinition(
       const sanitized = sanitizeDocumentTypes(config.documentTypes);
       if (sanitized) config.documentTypes = sanitized;
       else delete config.documentTypes;
+      if (node.type === "action.http_request") {
+        const httpConfig = sanitizeHttpRequestConfig(config);
+        return {
+          id: node.id,
+          type: node.type,
+          name: node.name,
+          config: httpConfig,
+          position: node.position,
+        };
+      }
       return {
         id: node.id,
         type: node.type,
@@ -159,13 +171,17 @@ export function defaultFieldValue(
   if (field.source === "documentFields") {
     return catalog.documentFields[0]?.path || "";
   }
-  // Optional documentTypes: omit from config so the trigger accepts all types.
-  if (key === "documentTypes") {
+  // Optional HTTP / documentTypes fields: omit so empty optionals stay out of JSON.
+  if (key === "documentTypes" || key === "timeoutSeconds" || key === "headers" || key === "body") {
     return undefined;
   }
   if (!field.required) {
     return undefined;
   }
+  if (key === "path") return "/";
+  if (key === "successStatusCodes") return [200];
+  if (key === "method" && field.type === "enum") return field.values?.[0] ?? "POST";
+  if (key === "connectionRef") return "";
   if (field.type === "array" && field.items === "string" && !field.required) {
     return undefined;
   }
@@ -330,6 +346,7 @@ export function toFlowEdges(
 export function preliminaryValidate(
   flow: FlowDefinition,
   catalog: Catalog,
+  connections: HttpConnection[] = [],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const triggers = flow.nodes.filter(
@@ -351,6 +368,28 @@ export function preliminaryValidate(
       });
       continue;
     }
+
+    if (node.type === "action.http_request") {
+      for (const message of validateHttpRequestConfig(
+        node.config || {},
+        connections,
+      )) {
+        issues.push({ nodeId: node.id, message });
+      }
+      const allowedOutputs = new Set(definition.outputs);
+      flow.edges
+        .filter((edge) => edge.source === node.id)
+        .forEach((edge) => {
+          if (!allowedOutputs.has(edge.branch)) {
+            issues.push({
+              nodeId: node.id,
+              message: `Collegamento ${edge.branch} non supportato da ${definition.label}`,
+            });
+          }
+        });
+      continue;
+    }
+
     for (const [key, field] of Object.entries(definition.configSchema)) {
       const value = node.config[key];
       const exempt = field.requiredExceptFor?.includes(
