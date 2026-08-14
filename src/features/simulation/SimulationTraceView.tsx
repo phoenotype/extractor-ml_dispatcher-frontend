@@ -329,26 +329,38 @@ export function SimulationTraceView({
           <div className="trace-empty">Nessun nodo eseguito</div>
         ) : (
           executed.map((step, stepIndex) => (
-            <div key={`exec-${stepIndex}`} className="trace-step executed">
-              <i>{stepIndex + 1}</i>
-              <span>
-                <strong>{step.nodeId || step.node || "Nodo"}</strong>
-                {step.nodeType ? <small>{step.nodeType}</small> : null}
-                {stepResultLabel(step) ? (
-                  <small>Esito: {stepResultLabel(step)}</small>
-                ) : null}
-                {step.details?.httpExecution &&
-                typeof step.details.httpExecution === "object" ? (
-                  <small>
-                    HTTP: {formatValue(step.details.httpExecution)}
-                  </small>
-                ) : null}
-              </span>
-              {step.branch ? (
-                <em className={String(step.branch)}>{String(step.branch)}</em>
-              ) : (
-                <em className="executed">eseguito</em>
-              )}
+            <div key={`exec-${stepIndex}`} className="trace-node-card">
+              <div className="trace-step executed">
+                <i>{stepIndex + 1}</i>
+                <span>
+                  <strong>{step.nodeId || step.node || "Nodo"}</strong>
+                  {step.nodeType ? <small>{step.nodeType}</small> : null}
+                  {stepResultLabel(step) ? (
+                    <small>Esito: {stepResultLabel(step)}</small>
+                  ) : null}
+                </span>
+                {step.branch ? (
+                  <em className={String(step.branch)}>{String(step.branch)}</em>
+                ) : (
+                  <em className="executed">eseguito</em>
+                )}
+              </div>
+              <div className="trace-io">
+                <details>
+                  <summary>Input</summary>
+                  <pre>{JSON.stringify(step.input ?? null, null, 2)}</pre>
+                </details>
+                <details open={step.nodeType === "action.http_request"}>
+                  <summary>Output</summary>
+                  <pre>
+                    {JSON.stringify(
+                      step.details?.httpExecution ?? step.output ?? null,
+                      null,
+                      2,
+                    )}
+                  </pre>
+                </details>
+              </div>
             </div>
           ))
         )}

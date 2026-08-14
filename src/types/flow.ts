@@ -86,6 +86,9 @@ export interface ExternalRequestResult {
   status: "completed" | "failed";
   statusCode?: number;
   error?: string;
+  durationMs?: number;
+  request?: Record<string, unknown>;
+  response?: Record<string, unknown> | null;
 }
 
 export interface TraceStep {
@@ -98,6 +101,8 @@ export interface TraceStep {
   conditionResult?: boolean;
   details?: TraceStepDetails;
   plannedMutations?: Array<Record<string, unknown>> | Record<string, unknown>;
+  input?: unknown;
+  output?: unknown;
   [key: string]: unknown;
 }
 
