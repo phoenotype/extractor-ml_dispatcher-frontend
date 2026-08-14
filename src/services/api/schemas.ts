@@ -189,8 +189,14 @@ export const httpAuthTypeSchema = z.enum([
 export const httpConnectionSchema = z
   .object({
     connectionName: z.string(),
-    baseUrl: z.string().optional(),
-    baseUrlEnv: z.string().optional(),
+    baseUrl: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
+    baseUrlEnv: z
+      .string()
+      .nullish()
+      .transform((value) => value ?? undefined),
     authType: httpAuthTypeSchema,
     authConfig: z.record(z.string(), z.string()).optional().default({}),
     defaultHeaders: z.record(z.string(), z.string()).optional().default({}),

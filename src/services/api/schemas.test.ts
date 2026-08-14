@@ -103,3 +103,23 @@ describe("simulation result schema", () => {
     expect(parsed.documents?.[0].stopped).toBe(true);
   });
 });
+
+describe("HTTP connection schema", () => {
+  it("normalizza i campi URL null restituiti da backend precedenti", async () => {
+    const { httpConnectionSchema } = await import("@/services/api/schemas");
+    const parsed = httpConnectionSchema.parse({
+      connectionName: "ifttt_dispatcher",
+      baseUrl: "https://maker.ifttt.com",
+      baseUrlEnv: null,
+      authType: "none",
+      authConfig: {},
+      defaultHeaders: {},
+      allowedMethods: ["POST"],
+      allowedPathPrefixes: ["/"],
+      timeoutSeconds: 20,
+      isActive: true,
+    });
+    expect(parsed.baseUrl).toBe("https://maker.ifttt.com");
+    expect(parsed.baseUrlEnv).toBeUndefined();
+  });
+});
