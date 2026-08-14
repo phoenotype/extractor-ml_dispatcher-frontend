@@ -130,19 +130,32 @@ export function FlowEditorPage() {
       },
     ) => {
       if (!catalog) return;
-      const selected = options?.selectedId;
-      setNodes(
-        toFlowNodes(
+      setNodes((current) => {
+        const built = toFlowNodes(
           next,
           catalog,
           options?.tracedNodes,
           options?.issues,
           options?.dimmedNodes,
-        ).map((node) => ({
-          ...node,
-          selected: selected ? node.id === selected : Boolean(node.selected),
-        })),
-      );
+        );
+        const selectedIds = new Set(
+          current.filter((node) => node.selected).map((node) => node.id),
+        );
+        if (options?.selectedId) {
+          selectedIds.clear();
+          selectedIds.add(options.selectedId);
+        } else if (options?.selectedId === null) {
+          selectedIds.clear();
+        }
+        return built.map((node) => {
+          const previous = current.find((item) => item.id === node.id);
+          return {
+            ...node,
+            position: previous?.position ?? node.position,
+            selected: selectedIds.has(node.id),
+          };
+        });
+      });
       setEdges(
         toFlowEdges(next, options?.tracedEdges, {
           grayInactive: Boolean(options?.tracedEdges?.size),
@@ -276,11 +289,12 @@ export function FlowEditorPage() {
 
   useEffect(() => {
     if (!catalog || !activeSimulation) return;
+    // Do not depend on selectedId here: rewriting nodes on selection would
+    // fight React Flow and can trigger maximum update depth errors.
     syncGraph(flow, {
       tracedNodes: highlight.tracedNodes,
       dimmedNodes: highlight.dimmedNodes,
       tracedEdges: highlight.tracedEdges,
-      selectedId,
     });
   }, [
     activeSimulation,
@@ -289,7 +303,6 @@ export function FlowEditorPage() {
     highlight.dimmedNodes,
     highlight.tracedEdges,
     highlight.tracedNodes,
-    selectedId,
     syncGraph,
   ]);
 

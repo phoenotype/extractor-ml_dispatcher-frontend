@@ -9,7 +9,6 @@ import {
   type EdgeChange,
   type Node,
   type NodeChange,
-  type OnSelectionChangeParams,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { FlowNodeCard } from "@/components/flow/FlowNodeCard";
@@ -56,12 +55,6 @@ function FlowCanvasInner({
       onConnect={onConnect}
       onNodeClick={(_, node) => onSelect(node.id)}
       onPaneClick={() => onSelect(null)}
-      onSelectionChange={(params: OnSelectionChangeParams) => {
-        // Ignore empty selections: React Flow often emits them when node data
-        // is refreshed (e.g. typing in the config panel), which would close the panel.
-        const id = params.nodes[0]?.id;
-        if (id) onSelect(id);
-      }}
       fitView
       nodesDraggable={!readOnly}
       nodesConnectable={!readOnly}
