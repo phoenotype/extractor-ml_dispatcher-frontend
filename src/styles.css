@@ -2639,3 +2639,117 @@ html[data-theme="dark"] .node-issues {
   border-color: rgba(185, 75, 75, 0.35);
   color: #f0b4b4;
 }
+/* Header layout aligned with lcdataextractor: logo, centered product, profile. */
+.list-header {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(180px, 1fr);
+}
+
+.header-logo-link {
+  width: fit-content;
+  text-decoration: none;
+}
+
+.header-product {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  line-height: 1.15;
+}
+
+.header-product strong {
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.header-product small {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 300;
+  opacity: 0.82;
+}
+
+.list-header .header-actions {
+  justify-self: end;
+}
+
+.list-header .user-chip {
+  cursor: pointer;
+}
+
+.list-header .user-chip small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.profile-menu {
+  position: relative;
+}
+
+.profile-dropdown {
+  position: absolute;
+  z-index: 100;
+  top: calc(100% + 13px);
+  right: 0;
+  min-width: 220px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(19, 49, 53, 0.18);
+  color: var(--text);
+}
+
+.profile-dropdown > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.profile-dropdown small {
+  color: var(--muted);
+}
+
+.profile-dropdown button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: transparent;
+  padding: 12px 16px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.profile-dropdown button:hover {
+  background: var(--surface-soft);
+}
+
+@media (max-width: 1000px) {
+  .list-header {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .list-header .environment,
+  .list-header #role-select {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .header-product {
+    align-items: flex-start;
+    padding-left: 12px;
+  }
+
+  .header-product small,
+  .list-header .theme-toggle,
+  .list-header .user-chip > span:not(.avatar) {
+    display: none;
+  }
+}

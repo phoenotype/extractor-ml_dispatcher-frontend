@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { LogOut, Moon, Sun } from "lucide-react";
+import { ChevronDown, LogOut, Moon, Sun } from "lucide-react";
 import { useRole } from "@/hooks/useRole";
 import { useThemeContext } from "@/components/theme/ThemeProvider";
 import { getLucySession, userInitials } from "@/lib/lucy-auth";
@@ -26,19 +27,36 @@ export function AppShell({
   const { role, setRole } = useRole();
   const { theme, toggleTheme } = useThemeContext();
   const session = getLucySession();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
   const displayName =
     session?.user.full_name || session?.user.username || "Operatore";
+
+  useEffect(() => {
+    const closeProfile = (event: MouseEvent) => {
+      if (!profileRef.current?.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeProfile);
+    return () => document.removeEventListener("mousedown", closeProfile);
+  }, []);
 
   return (
     <div className="app">
       <header className="list-header">
-        <Link to="/" className="brand" style={{ textDecoration: "none" }}>
+        <Link
+          to="/"
+          className="brand header-logo-link"
+          aria-label="Lucy - torna ai flussi"
+        >
           <span className="brand-logo" aria-hidden />
-          <span className="brand-copy">
-            <strong>{title}</strong>
-            <small>{subtitle}</small>
-          </span>
         </Link>
+
+        <div className="header-product" aria-label={`${title}, ${subtitle}`}>
+          <strong>{title}</strong>
+          <small>{subtitle}</small>
+        </div>
 
         <div className="header-actions">
           <span className="environment">
@@ -73,28 +91,42 @@ export function AppShell({
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
 
-          <div className="user-chip" aria-label="Utente corrente">
-            <span className="avatar">{userInitials(session?.user)}</span>
-            <span>
-              <b>{displayName}</b>
-              <small>{role}</small>
-            </span>
-          </div>
-
-          {session ? (
+          <div className="profile-menu" ref={profileRef}>
             <button
               type="button"
-              className="icon-button"
-              title="Esci"
-              aria-label="Esci"
-              onClick={() => {
-                clearLucySession();
-                window.location.reload();
-              }}
+              className="user-chip"
+              aria-label="Apri menu profilo"
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
             >
-              <LogOut size={17} />
+              <span className="avatar">{userInitials(session?.user)}</span>
+              <span>
+                <b>{displayName}</b>
+                <small>
+                  {role} <ChevronDown size={12} aria-hidden />
+                </small>
+              </span>
             </button>
-          ) : null}
+            {profileOpen ? (
+              <div className="profile-dropdown">
+                <div>
+                  <b>{displayName}</b>
+                  <small>{session?.user.username || role}</small>
+                </div>
+                {session ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearLucySession();
+                      window.location.reload();
+                    }}
+                  >
+                    <LogOut size={16} /> Esci
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       </header>
       {children}
