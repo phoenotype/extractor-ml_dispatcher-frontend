@@ -1964,6 +1964,13 @@ html[data-theme="dark"] .field-path-selected {
   gap: 6px;
 }
 
+.python-code-field textarea {
+  min-height: 240px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  tab-size: 2;
+}
+
 .simulation-result-detailed {
   grid-template-columns: minmax(0, 1fr);
 }

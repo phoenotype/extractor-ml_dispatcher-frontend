@@ -4,6 +4,7 @@ export type CatalogFieldType =
   | "boolean"
   | "array"
   | "enum"
+  | "code"
   | "any";
 
 export interface CatalogConfigField {
@@ -15,6 +16,7 @@ export interface CatalogConfigField {
   source?: "documentFields" | "exportStatuses";
   label?: string;
   description?: string;
+  language?: string;
 }
 
 export interface CatalogNodeType {

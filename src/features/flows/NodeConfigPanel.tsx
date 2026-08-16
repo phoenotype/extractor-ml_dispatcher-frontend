@@ -446,6 +446,27 @@ function DynamicConfigField({
     );
   }
 
+  if (field.type === "code") {
+    return (
+      <label className="python-code-field">
+        {label}
+        <textarea
+          disabled={disabled}
+          spellCheck={false}
+          value={String(value ?? "")}
+          placeholder={
+            "result = {\n  'protocol': document['protocol'],\n  'previous': nodes['http_1']['output']\n}"
+          }
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <small className="field-hint">
+          Usa document e nodes. Assegna sempre l'output JSON a result. Import,
+          filesystem, rete e accesso agli attributi non sono consentiti.
+        </small>
+      </label>
+    );
+  }
+
   return (
     <label>
       {label}

@@ -132,6 +132,21 @@ export const mockCatalog: Catalog = {
       outputs: ["always"],
     },
     {
+      type: "action.python",
+      category: "action",
+      label: "Python",
+      description: "Elabora il documento e gli output dei nodi precedenti",
+      configSchema: {
+        code: {
+          type: "code",
+          language: "python",
+          required: true,
+          label: "Codice Python",
+        },
+      },
+      outputs: ["always"],
+    },
+    {
       type: "stop",
       category: "control",
       label: "Termina flusso",

@@ -156,9 +156,17 @@ export const simulationResultSchema = simulationDocumentSchema.extend({
 
 export const catalogConfigFieldSchema = z
   .object({
-    type: z.enum(["string", "number", "boolean", "array", "enum", "any"]),
+    type: z.enum([
+      "string",
+      "number",
+      "boolean",
+      "array",
+      "enum",
+      "code",
+      "any",
+    ]),
     items: z
-      .enum(["string", "number", "boolean", "array", "enum", "any"])
+      .enum(["string", "number", "boolean", "array", "enum", "code", "any"])
       .optional(),
     values: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
     required: z.boolean().optional(),
@@ -166,6 +174,7 @@ export const catalogConfigFieldSchema = z
     source: z.enum(["documentFields", "exportStatuses"]).optional(),
     label: z.string().optional(),
     description: z.string().optional(),
+    language: z.string().optional(),
   })
   .passthrough();
 
