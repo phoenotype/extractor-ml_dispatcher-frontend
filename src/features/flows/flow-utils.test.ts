@@ -4,6 +4,7 @@ import {
   formatTriggerSummary,
   getFlowTriggerSummary,
   preliminaryValidate,
+  removeFlowNodes,
   sanitizeDocumentTypes,
   slug,
   toFlowEdges,
@@ -150,6 +151,26 @@ describe("defaultFieldValue", () => {
         "code",
       ),
     ).toContain('result = {\n  "protocol"');
+  });
+});
+
+describe("removeFlowNodes", () => {
+  it("rimuove il nodo azione e i suoi collegamenti ma protegge il trigger", () => {
+    const flow: FlowDefinition = {
+      schemaVersion: 1,
+      flowName: "demo",
+      nodes: [
+        { id: "t1", type: "trigger.export_status", name: "Trigger", config: {} },
+        { id: "c1", type: "condition", name: "Condition", config: {} },
+      ],
+      edges: [{ source: "t1", target: "c1", branch: "always" }],
+      settings: { requiresExplicitOptIn: true },
+    };
+    const withoutAction = removeFlowNodes(flow, new Set(["c1"]), catalog);
+    expect(withoutAction.nodes.map((node) => node.id)).toEqual(["t1"]);
+    expect(withoutAction.edges).toEqual([]);
+    const protectedTrigger = removeFlowNodes(flow, new Set(["t1"]), catalog);
+    expect(protectedTrigger.nodes).toHaveLength(2);
   });
 });
 

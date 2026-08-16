@@ -31,6 +31,7 @@ import {
   isVisualFlow,
   normalizeFlowDefinition,
   preliminaryValidate,
+  removeFlowNodes,
   sanitizeDocumentTypes,
   slug,
   toFlowEdges,
@@ -430,20 +431,42 @@ export function FlowEditorPage() {
   };
 
   const onNodesChange = (changes: NodeChange<Node<FlowNodeData>>[]) => {
-    setNodes((current) => applyNodeChanges(changes, current));
+    const requestedRemovals = new Set(
+      changes.filter((change) => change.type === "remove").map((change) => change.id),
+    );
+    const removableIds = new Set(
+      flow.nodes
+        .filter(
+          (node) =>
+            requestedRemovals.has(node.id) &&
+            catalogNode(catalog!, node.type).category !== "trigger",
+        )
+        .map((node) => node.id),
+    );
+    const applicableChanges = changes.filter(
+      (change) => change.type !== "remove" || removableIds.has(change.id),
+    );
+    setNodes((current) => applyNodeChanges(applicableChanges, current));
     const positions = changes.filter(
       (change) => change.type === "position" && change.position,
     );
-    if (positions.length) {
-      const next = cloneFlow(flow);
+    if (positions.length || removableIds.size) {
+      const next = removableIds.size
+        ? removeFlowNodes(flow, removableIds, catalog!)
+        : cloneFlow(flow);
       positions.forEach((change) => {
         if (change.type === "position") {
           const item = next.nodes.find((node) => node.id === change.id);
           if (item && change.position) item.position = change.position;
         }
       });
-      setFlow(next);
-      setDirty(true);
+      if (removableIds.size) {
+        commitFlow(next);
+        if (selectedId && removableIds.has(selectedId)) setSelectedId(null);
+      } else {
+        setFlow(next);
+        setDirty(true);
+      }
     }
   };
 

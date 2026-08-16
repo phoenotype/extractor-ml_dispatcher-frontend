@@ -42,6 +42,28 @@ export function cloneFlow(flow: FlowDefinition): FlowDefinition {
   return structuredClone(flow);
 }
 
+export function removeFlowNodes(
+  flow: FlowDefinition,
+  nodeIds: Set<string>,
+  catalog: Catalog,
+): FlowDefinition {
+  const removable = new Set(
+    flow.nodes
+      .filter(
+        (node) =>
+          nodeIds.has(node.id) && catalogNode(catalog, node.type).category !== "trigger",
+      )
+      .map((node) => node.id),
+  );
+  if (!removable.size) return cloneFlow(flow);
+  const next = cloneFlow(flow);
+  next.nodes = next.nodes.filter((node) => !removable.has(node.id));
+  next.edges = next.edges.filter(
+    (edge) => !removable.has(edge.source) && !removable.has(edge.target),
+  );
+  return next;
+}
+
 export function slug(value: string): string {
   return value
     .toLowerCase()
