@@ -13,6 +13,7 @@ interface FieldPathPickerProps {
   label?: string;
   value: unknown;
   fields: CatalogDocumentField[];
+  nodeOutputPaths?: string[];
   disabled?: boolean;
   onChange: (path: string) => void;
 }
@@ -21,6 +22,7 @@ export function FieldPathPicker({
   label = "Campo",
   value,
   fields,
+  nodeOutputPaths = [],
   disabled,
   onChange,
 }: FieldPathPickerProps) {
@@ -111,13 +113,34 @@ export function FieldPathPicker({
         )}
       </div>
 
+      {nodeOutputPaths.length ? (
+        <div className="field-path-section node-output-paths">
+          <b>Output nodi precedenti</b>
+          <div className="field-path-options">
+            {nodeOutputPaths.map((path) => (
+              <button
+                key={path}
+                type="button"
+                disabled={disabled}
+                className={`field-path-option ${path === selectedPath ? "selected" : ""}`}
+                onClick={() => onChange(path)}
+              >
+                <strong>{path.split(".")[1]}</strong>
+                <code>{path}</code>
+                <em>output</em>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="field-path-manual">
         <small>Percorso personalizzato</small>
         <div className="tag-input-row">
           <input
             disabled={disabled}
             value={manual}
-            placeholder="es. metadata.custom_flag"
+            placeholder="es. metadata.custom_flag o nodes.python_1.output.result"
             onChange={(event) => setManual(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") {

@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   CircleOff,
+  Copy,
   Play,
   RefreshCw,
   ShieldCheck,
@@ -35,9 +36,13 @@ function resultLabel(step: TraceStep): string {
 }
 
 function httpExecution(step: TraceStep): HttpExecution | undefined {
-  return step.nodeType === "action.http_request"
-    ? step.details?.httpExecution
-    : undefined;
+  if (step.nodeType !== "action.http_request") return undefined;
+  if (step.details?.httpExecution) return step.details.httpExecution;
+  if (step.output && typeof step.output === "object") {
+    const output = step.output as HttpExecution;
+    if (output.status === "completed" || output.status === "failed") return output;
+  }
+  return undefined;
 }
 
 function httpTone(step: TraceStep): string {
@@ -90,21 +95,56 @@ function externalSummary(document: SimulationDocument) {
   return { attempted, succeeded, planned, failed };
 }
 
+function JsonPanel({ label, value, open }: { label: string; value: unknown; open?: boolean }) {
+  return (
+    <details open={open}>
+      <summary>
+        {label}
+        <button
+          type="button"
+          className="trace-copy"
+          aria-label={`Copia ${label}`}
+          onClick={(event) => {
+            event.preventDefault();
+            void navigator.clipboard?.writeText(json(value));
+          }}
+        >
+          <Copy size={13} /> Copia
+        </button>
+      </summary>
+      <pre>{json(value)}</pre>
+    </details>
+  );
+}
+
 function NodeTraceCard({ step, index }: { step: TraceStep; index: number }) {
   const skipped = step.status === "skipped";
   const isHttp = step.nodeType === "action.http_request";
   const execution = httpExecution(step);
   const tone = httpTone(step);
+  const error = execution?.error ||
+    (typeof step.details?.error === "string" ? step.details.error : undefined) ||
+    (step.output && typeof step.output === "object" && "error" in step.output
+      ? String((step.output as { error: unknown }).error)
+      : undefined);
+  const duration = execution?.durationMs ??
+    (typeof step.details?.durationMs === "number" ? step.details.durationMs : undefined);
+  const displayName =
+    typeof step.name === "string" ? step.name :
+      typeof step.nodeName === "string" ? step.nodeName :
+        step.nodeId || step.node || "Nodo";
 
   return (
     <article className={`trace-node-card ${tone} ${skipped ? "is-skipped" : ""}`}>
       <div className={`trace-step ${skipped ? "skipped" : "executed"}`}>
         <i>{index + 1}</i>
         <span>
-          <strong>{step.nodeId || step.node || "Nodo"}</strong>
+          <strong>{displayName}</strong>
+          <small>ID: {step.nodeId || step.node || "—"}</small>
           <small>Tipo: {step.nodeType || "—"}</small>
           <small>Status: {step.status || "executed"}</small>
-          <small>Result: {resultLabel(step)}</small>
+          <small>Ramo: {step.branch || resultLabel(step)}</small>
+          {duration !== undefined ? <small>Durata: {duration.toFixed(2)} ms</small> : null}
           {skipped && typeof step.details?.reason === "string" ? (
             <small>Motivo: {step.details.reason}</small>
           ) : null}
@@ -116,14 +156,26 @@ function NodeTraceCard({ step, index }: { step: TraceStep; index: number }) {
 
       {!skipped ? (
         <div className="trace-io">
-          <details>
-            <summary>Input</summary>
-            <pre>{json(step.input)}</pre>
-          </details>
-          <details open={isHttp}>
-            <summary>Output</summary>
-            <pre>{json(isHttp ? execution : step.output)}</pre>
-          </details>
+          <JsonPanel label="Input" value={step.input} />
+          <JsonPanel
+            label="Output"
+            value={isHttp && execution ? execution : step.output}
+            open={isHttp || step.nodeType === "action.python" || Boolean(error)}
+          />
+          {error ? <div className="trace-error"><b>Errore</b><span>{error}</span></div> : null}
+          {isHttp && execution ? (
+            <div className="http-execution-detail">
+              <div><b>Status code</b><span>{execution.statusCode ?? (execution.response as { statusCode?: number } | null)?.statusCode ?? "—"}</span></div>
+              <div><b>Durata</b><span>{execution.durationMs !== undefined ? `${execution.durationMs.toFixed(2)} ms` : "—"}</span></div>
+              <JsonPanel label="Request" value={execution.request} />
+              <JsonPanel label="Response" value={execution.response} />
+              {(execution.response as { bodyTruncated?: boolean } | null)?.bodyTruncated ? (
+                <small className="field-error">Body della risposta troncato dal backend</small>
+              ) : null}
+            </div>
+          ) : isHttp ? (
+            <div className="http-planned-message">Richiesta HTTP pianificata, non inviata</div>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -170,6 +222,8 @@ export function SimulationTraceView({
   }
 
   const trace = document.trace || [];
+  const reachedTrace = trace.filter((step) => step.status !== "skipped");
+  const skippedTrace = trace.filter((step) => step.status === "skipped");
   const external = externalSummary(document);
   const stoppedReason =
     document.stopReason ||
@@ -257,8 +311,8 @@ export function SimulationTraceView({
 
       <section className="trace detailed-trace">
         <b>Traccia ordinata dei nodi</b>
-        {trace.length ? (
-          trace.map((step, stepIndex) => (
+        {reachedTrace.length ? (
+          reachedTrace.map((step, stepIndex) => (
             <NodeTraceCard
               key={`${step.nodeId || step.node || "node"}-${stepIndex}`}
               step={step}
@@ -269,6 +323,19 @@ export function SimulationTraceView({
           <div className="trace-empty">Nessun nodo presente nella traccia</div>
         )}
       </section>
+
+      {skippedTrace.length ? (
+        <section className="trace detailed-trace skipped-trace">
+          <b>Nodi non raggiunti</b>
+          {skippedTrace.map((step, stepIndex) => (
+            <NodeTraceCard
+              key={`${step.nodeId || step.node || "skipped"}-${stepIndex}`}
+              step={step}
+              index={reachedTrace.length + stepIndex}
+            />
+          ))}
+        </section>
+      ) : null}
 
       <div className="planned-mutations">
         <b>{mutations.length ? "Modifiche pianificate" : "Nessuna modifica pianificata"}</b>

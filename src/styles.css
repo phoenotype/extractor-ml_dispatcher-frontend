@@ -1971,6 +1971,102 @@ html[data-theme="dark"] .field-path-selected {
   tab-size: 2;
 }
 
+.python-code-help {
+  display: grid;
+  gap: 5px;
+}
+
+.python-code-help pre,
+.trace-io pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.template-variables-help {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.template-variables-help summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.template-variable-list {
+  display: grid;
+  max-height: 180px;
+  gap: 5px;
+  margin: 7px 0 12px;
+  overflow: auto;
+}
+
+.template-variable-list button,
+.trace-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 7px 9px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.trace-io details summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.trace-copy {
+  display: inline-flex;
+  padding: 3px 7px;
+  font-size: 11px;
+}
+
+.trace-error,
+.http-planned-message {
+  grid-column: 1 / -1;
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+
+.trace-error {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #fff0f0;
+  color: #a72e2e;
+}
+
+.http-planned-message {
+  background: #fff7dd;
+  color: #80600b;
+  font-weight: 700;
+}
+
+.http-execution-detail {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.http-execution-detail > div:not(.trace-error) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+@media (max-width: 720px) {
+  .http-execution-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
 .simulation-result-detailed {
   grid-template-columns: minmax(0, 1fr);
 }

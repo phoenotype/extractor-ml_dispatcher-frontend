@@ -47,4 +47,24 @@ describe("SimulationTraceView", () => {
     expect(container.querySelector(".is-skipped .trace-io")).toBeNull();
     expect(container.textContent).toContain("https://masked/***");
   });
+
+  it("apre l'output Python e separa i nodi non raggiunti", () => {
+    const { container } = render(
+      <SimulationTraceView
+        documents={[{
+          trace: [
+            { nodeId: "python_1", nodeType: "action.python", status: "executed", input: { document: {} }, output: { result: { ok: true }, branch: "always" } },
+            { nodeId: "http_1", nodeType: "action.http_request", status: "executed", output: { branch: "always" } },
+            { nodeId: "stop_1", nodeType: "stop", status: "skipped", input: null, output: null, details: { reason: "Node not reached" } },
+          ],
+        }]}
+        index={0}
+        onIndexChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Nodi non raggiunti")).toBeTruthy();
+    expect(screen.getByText("Richiesta HTTP pianificata, non inviata")).toBeTruthy();
+    expect(container.querySelector(".trace-node-card details[open]")).toBeTruthy();
+    expect(container.querySelector(".is-skipped .trace-io")).toBeNull();
+  });
 });

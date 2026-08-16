@@ -379,7 +379,10 @@ export function FlowEditorPage() {
     const next = cloneFlow(flow);
     const definition = catalogNode(catalog, type);
     const count = next.nodes.filter((node) => node.type === type).length + 1;
-    const id = `${type.split(".").pop()?.replace(/[^a-z]/g, "_")}_${count}`;
+    const idBase = type.split(".").pop()?.replace(/[^a-z]/g, "_") || "node";
+    let suffix = count;
+    while (next.nodes.some((node) => node.id === `${idBase}_${suffix}`)) suffix += 1;
+    const id = `${idBase}_${suffix}`;
     const config = Object.fromEntries(
       Object.entries(definition.configSchema)
         .map(([key, field]) => [key, defaultFieldValue(field, catalog, key)] as const)
@@ -390,7 +393,10 @@ export function FlowEditorPage() {
       type,
       name: definition.label,
       config,
-      position: { x: 280 + count * 40, y: 90 + count * 80 },
+      position:
+        type === "action.python" && count === 1
+          ? { x: 400, y: 200 }
+          : { x: 280 + count * 40, y: 90 + count * 80 },
     });
     commitFlow(next);
     setSelectedId(id);
@@ -896,6 +902,7 @@ export function FlowEditorPage() {
           <NodeConfigPanel
             node={selected}
             catalog={catalog}
+            flow={flow}
             disabled={readOnly}
             issues={(validation?.issues || []).filter(
               (issue) => issue.nodeId && issue.nodeId === selected?.id,

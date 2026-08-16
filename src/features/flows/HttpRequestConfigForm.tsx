@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, Copy, ExternalLink } from "lucide-react";
 import {
   isRelativeHttpPath,
   looksLikeAbsoluteUrl,
@@ -10,16 +10,21 @@ import {
 import { useConnectionsQuery } from "@/features/connections/useConnectionsQuery";
 import { JsonConfigField } from "@/features/flows/JsonConfigField";
 import { HTTP_METHODS } from "@/types/connection";
+import type { CatalogDocumentField } from "@/types/catalog";
 
 interface HttpRequestConfigFormProps {
   config: Record<string, unknown>;
   disabled?: boolean;
+  documentFields: CatalogDocumentField[];
+  nodeOutputPaths: string[];
   onChange: (patch: Record<string, unknown>) => void;
 }
 
 export function HttpRequestConfigForm({
   config,
   disabled,
+  documentFields,
+  nodeOutputPaths,
   onChange,
 }: HttpRequestConfigFormProps) {
   const connectionsQuery = useConnectionsQuery();
@@ -173,6 +178,11 @@ export function HttpRequestConfigForm({
         onChange={(body) => patchConfig({ body })}
       />
 
+      <TemplateVariablesHelp
+        documentFields={documentFields}
+        nodeOutputPaths={nodeOutputPaths}
+      />
+
       <SuccessStatusCodesField
         value={config.successStatusCodes}
         disabled={disabled}
@@ -220,6 +230,47 @@ export function HttpRequestConfigForm({
         </p>
       ) : null}
     </div>
+  );
+}
+
+function TemplateVariablesHelp({
+  documentFields,
+  nodeOutputPaths,
+}: {
+  documentFields: CatalogDocumentField[];
+  nodeOutputPaths: string[];
+}) {
+  const copy = (path: string) => {
+    void navigator.clipboard?.writeText(`{{ ${path} }}`);
+  };
+
+  return (
+    <details className="template-variables-help">
+      <summary>Variabili disponibili</summary>
+      <p className="field-hint">
+        Copia un template e usalo in percorso, headers o body.
+      </p>
+      <b>Campi documento</b>
+      <div className="template-variable-list">
+        {documentFields.map((field) => (
+          <button key={field.path} type="button" onClick={() => copy(`document.${field.path}`)}>
+            <code>{`{{ document.${field.path} }}`}</code><Copy size={13} />
+          </button>
+        ))}
+      </div>
+      {nodeOutputPaths.length ? (
+        <>
+          <b>Output nodi precedenti</b>
+          <div className="template-variable-list">
+            {nodeOutputPaths.map((path) => (
+              <button key={path} type="button" onClick={() => copy(path)}>
+                <code>{`{{ ${path} }}`}</code><Copy size={13} />
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </details>
   );
 }
 

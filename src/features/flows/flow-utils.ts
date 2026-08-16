@@ -167,6 +167,9 @@ export function defaultFieldValue(
   fieldKey?: string,
 ): unknown {
   const key = fieldKey || "";
+  if (field.type === "code" && field.language === "python") {
+    return 'result = {\n  "protocol": document["protocol"]\n}';
+  }
   if (field.source === "exportStatuses" || key === "exportStatuses") {
     return field.type === "array"
       ? [catalog.exportStatuses[0]?.value].filter((value) => value !== undefined)
@@ -353,6 +356,23 @@ export function preliminaryValidate(
   connections: HttpConnection[] = [],
 ): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
+  const ids = new Set<string>();
+  const duplicateIds = new Set<string>();
+  for (const node of flow.nodes) {
+    if (ids.has(node.id)) duplicateIds.add(node.id);
+    ids.add(node.id);
+  }
+  duplicateIds.forEach((nodeId) =>
+    issues.push({ nodeId, message: `ID nodo duplicato: ${nodeId}` }),
+  );
+  for (const edge of flow.edges) {
+    if (!ids.has(edge.source)) {
+      issues.push({ message: `Collegamento con sorgente inesistente: ${edge.source}` });
+    }
+    if (!ids.has(edge.target)) {
+      issues.push({ message: `Collegamento con destinazione inesistente: ${edge.target}` });
+    }
+  }
   if (containsEmbeddedSecret(flow)) {
     issues.push({
       message:
@@ -370,6 +390,45 @@ export function preliminaryValidate(
   }
 
   for (const node of flow.nodes) {
+    if (
+      node.position !== undefined &&
+      (!Number.isFinite(node.position.x) || !Number.isFinite(node.position.y))
+    ) {
+      issues.push({
+        nodeId: node.id,
+        message: "Le coordinate del nodo devono essere numeriche",
+      });
+    }
+
+    const ancestors = new Set<string>();
+    const visit = (target: string) => {
+      flow.edges
+        .filter((edge) => edge.target === target)
+        .forEach((edge) => {
+          if (ancestors.has(edge.source)) return;
+          ancestors.add(edge.source);
+          visit(edge.source);
+        });
+    };
+    visit(node.id);
+    const inspectReferences = (value: unknown) => {
+      if (typeof value === "string") {
+        for (const match of value.matchAll(/nodes\.([A-Za-z0-9_-]+)\./g)) {
+          const referenced = match[1];
+          if (!ids.has(referenced)) {
+            issues.push({ nodeId: node.id, message: `Riferimento a nodo inesistente: ${referenced}` });
+          } else if (!ancestors.has(referenced)) {
+            issues.push({ nodeId: node.id, message: `Il nodo ${referenced} non precede ${node.id}` });
+          }
+        }
+      } else if (Array.isArray(value)) {
+        value.forEach(inspectReferences);
+      } else if (value && typeof value === "object") {
+        Object.values(value as Record<string, unknown>).forEach(inspectReferences);
+      }
+    };
+    inspectReferences(node.config);
+
     const definition = catalog.nodeTypes.find((item) => item.type === node.type);
     if (!definition) {
       issues.push({

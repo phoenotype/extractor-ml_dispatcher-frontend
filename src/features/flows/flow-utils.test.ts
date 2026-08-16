@@ -141,6 +141,16 @@ describe("defaultFieldValue", () => {
       defaultFieldValue({ type: "any", required: false }, catalog, "headers"),
     ).toBeUndefined();
   });
+
+  it("inizializza il codice Python con un result JSON", () => {
+    expect(
+      defaultFieldValue(
+        { type: "code", language: "python", required: true },
+        catalog,
+        "code",
+      ),
+    ).toContain('result = {\n  "protocol"');
+  });
 });
 
 describe("getFlowTriggerSummary", () => {
@@ -213,5 +223,28 @@ describe("preliminaryValidate", () => {
     expect(
       issues.some((i) => i.message.toLowerCase().includes("documenttypes")),
     ).toBe(true);
+  });
+
+  it("valida ID, collegamenti, coordinate e riferimenti ai nodi precedenti", () => {
+    const flow: FlowDefinition = {
+      schemaVersion: 1,
+      flowName: "invalid_graph",
+      nodes: [
+        { id: "t1", type: "trigger.export_status", name: "Trigger", config: { exportStatuses: [4] } },
+        { id: "same", type: "condition", name: "A", config: { field: "nodes.later.output.result", operator: "eq", value: 1 }, position: { x: Number.NaN, y: 20 } },
+        { id: "same", type: "condition", name: "B", config: { field: "a", operator: "eq", value: 1 } },
+        { id: "later", type: "condition", name: "Later", config: { field: "a", operator: "eq", value: 1 } },
+      ],
+      edges: [
+        { source: "t1", target: "same", branch: "always" },
+        { source: "missing", target: "later", branch: "always" },
+      ],
+      settings: { requiresExplicitOptIn: true },
+    };
+    const issues = preliminaryValidate(flow, catalog);
+    expect(issues.some((issue) => issue.message.includes("duplicato"))).toBe(true);
+    expect(issues.some((issue) => issue.message.includes("sorgente inesistente"))).toBe(true);
+    expect(issues.some((issue) => issue.message.includes("coordinate"))).toBe(true);
+    expect(issues.some((issue) => issue.message.includes("non precede"))).toBe(true);
   });
 });

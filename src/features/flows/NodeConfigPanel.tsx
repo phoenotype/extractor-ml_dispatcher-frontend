@@ -16,11 +16,12 @@ import {
   slug,
 } from "@/features/flows/flow-utils";
 import type { Catalog, CatalogConfigField } from "@/types/catalog";
-import type { FlowNodeDefinition, ValidationIssue } from "@/types/flow";
+import type { FlowDefinition, FlowNodeDefinition, ValidationIssue } from "@/types/flow";
 
 interface NodeConfigPanelProps {
   node: FlowNodeDefinition | null;
   catalog: Catalog;
+  flow: FlowDefinition;
   disabled?: boolean;
   issues?: ValidationIssue[];
   onClose: () => void;
@@ -35,6 +36,7 @@ interface NodeConfigPanelProps {
 export function NodeConfigPanel({
   node,
   catalog,
+  flow,
   disabled,
   issues = [],
   onClose,
@@ -58,6 +60,7 @@ export function NodeConfigPanel({
         <DynamicNodeForm
           node={node}
           catalog={catalog}
+          flow={flow}
           disabled={disabled}
           issues={issues}
           onUpdate={onUpdate}
@@ -78,6 +81,7 @@ export function NodeConfigPanel({
 function DynamicNodeForm({
   node,
   catalog,
+  flow,
   disabled,
   issues,
   onUpdate,
@@ -86,6 +90,7 @@ function DynamicNodeForm({
 }: {
   node: FlowNodeDefinition;
   catalog: Catalog;
+  flow: FlowDefinition;
   disabled?: boolean;
   issues: ValidationIssue[];
   onUpdate: (
@@ -98,6 +103,37 @@ function DynamicNodeForm({
   const definition = ensureTriggerConfigSchema(catalogNode(catalog, node.type));
   const visual = nodeVisual(definition);
   const Icon = visual.icon;
+  const previousNodes = useMemo(() => {
+    const ancestors = new Set<string>();
+    const visit = (target: string) => {
+      flow.edges
+        .filter((edge) => edge.target === target)
+        .forEach((edge) => {
+          if (ancestors.has(edge.source)) return;
+          ancestors.add(edge.source);
+          visit(edge.source);
+        });
+    };
+    visit(node.id);
+    return flow.nodes.filter((item) => ancestors.has(item.id));
+  }, [flow, node.id]);
+  const nodeOutputPaths = useMemo(
+    () =>
+      previousNodes.flatMap((item) => {
+        if (item.type === "action.http_request") {
+          return [
+            `nodes.${item.id}.output.status`,
+            `nodes.${item.id}.output.statusCode`,
+            `nodes.${item.id}.output.response.statusCode`,
+            `nodes.${item.id}.output.response.body`,
+          ];
+        }
+        if (item.type === "action.python") return [`nodes.${item.id}.output.result`];
+        if (item.type === "condition") return [`nodes.${item.id}.output.matched`];
+        return [`nodes.${item.id}.output`];
+      }),
+    [previousNodes],
+  );
 
   const replaceHttpConfig = (nextConfig: Record<string, unknown>) => {
     const clears = Object.fromEntries(
@@ -144,6 +180,8 @@ function DynamicNodeForm({
         <HttpRequestConfigForm
           config={node.config}
           disabled={disabled}
+          documentFields={catalog.documentFields}
+          nodeOutputPaths={nodeOutputPaths}
           onChange={replaceHttpConfig}
         />
       ) : (
@@ -155,6 +193,7 @@ function DynamicNodeForm({
             value={node.config[key]}
             config={node.config}
             catalog={catalog}
+            nodeOutputPaths={nodeOutputPaths}
             disabled={disabled}
             onChange={(value) => onUpdate({}, { [key]: value })}
             onConfigPatch={(patch) => onUpdate({}, patch)}
@@ -218,6 +257,7 @@ function DynamicConfigField({
   value,
   config,
   catalog,
+  nodeOutputPaths,
   disabled,
   onChange,
   onConfigPatch,
@@ -227,6 +267,7 @@ function DynamicConfigField({
   value: unknown;
   config: Record<string, unknown>;
   catalog: Catalog;
+  nodeOutputPaths: string[];
   disabled?: boolean;
   onChange: (value: unknown) => void;
   onConfigPatch: (patch: Record<string, unknown>) => void;
@@ -243,6 +284,7 @@ function DynamicConfigField({
         label={field.label || "Campo"}
         value={value}
         fields={catalog.documentFields}
+        nodeOutputPaths={nodeOutputPaths}
         disabled={disabled}
         onChange={(path) => {
           const docField = findDocumentField(catalog.documentFields, path);
@@ -459,10 +501,18 @@ function DynamicConfigField({
           }
           onChange={(event) => onChange(event.target.value)}
         />
-        <small className="field-hint">
-          Usa document e nodes. Assegna sempre l&apos;output JSON a result. Import,
-          filesystem, rete e accesso agli attributi non sono consentiti.
-        </small>
+        <div className="python-code-help field-hint">
+          <b>Variabili e regole</b>
+          <span><code>document</code> contiene il documento corrente.</span>
+          <span><code>nodes</code> contiene gli output dei nodi precedenti.</span>
+          <span>Assegna l&apos;output a <code>result</code>, serializzabile JSON.</span>
+          <span>Non sono consentiti import, filesystem, rete, attributi Python o cicli.</span>
+          <pre>{`result = {
+  "protocol": document["protocol"],
+  "httpStatus": nodes["http_1"]["output"]["response"]["statusCode"],
+  "httpBody": nodes["http_1"]["output"]["response"]["body"]
+}`}</pre>
+        </div>
       </label>
     );
   }
