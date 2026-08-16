@@ -162,7 +162,12 @@ export const mockCatalog: Catalog = {
           values: ["update", "upsert"],
           required: true,
         },
-        selector: { type: "any", required: false },
+        selector: {
+          type: "any",
+          required: false,
+          description:
+            "w_batch_fields: fieldCode + number. w_table_fields: idFieldGroup + rowNumber + idColumn.",
+        },
         values: { type: "any", required: true },
       },
       outputs: ["always"],

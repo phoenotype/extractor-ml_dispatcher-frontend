@@ -481,13 +481,18 @@ function DynamicConfigField({
     (["headers", "body", "selector", "values"].includes(fieldKey))
   ) {
     return (
-      <JsonConfigField
-        label={label}
-        value={value}
-        disabled={disabled}
-        requireObject={["headers", "selector", "values"].includes(fieldKey)}
-        onChange={onChange}
-      />
+      <div className="json-config-with-hint">
+        <JsonConfigField
+          label={label}
+          value={value}
+          disabled={disabled}
+          requireObject={["headers", "selector", "values"].includes(fieldKey)}
+          onChange={onChange}
+        />
+        {field.description ? (
+          <small className="field-hint">{field.description}</small>
+        ) : null}
+      </div>
     );
   }
 
