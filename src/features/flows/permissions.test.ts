@@ -3,6 +3,7 @@ import {
   canEditFlows,
   canRunFlows,
   canRunNow,
+  runDisabledReason,
   canSimulate,
   canValidate,
   isReadOnlyRole,
@@ -51,5 +52,17 @@ describe("permissions", () => {
         hasRecentSimulation: false,
       }),
     ).toBe(false);
+  });
+
+  it("spiega perché l'esecuzione non è disponibile", () => {
+    expect(
+      runDisabledReason({ role: "editor", legacy: false, dirty: false, valid: true, hasRecentSimulation: true }),
+    ).toBe("Disponibile solo con ruolo operator");
+    expect(
+      runDisabledReason({ role: "operator", legacy: false, dirty: true, valid: true, hasRecentSimulation: true }),
+    ).toBe("Salva le modifiche prima di eseguire");
+    expect(
+      runDisabledReason({ role: "operator", legacy: false, dirty: false, valid: true, hasRecentSimulation: false }),
+    ).toContain("simulazione");
   });
 });

@@ -41,6 +41,7 @@ import {
 import {
   canEditFlows,
   canRunNow,
+  runDisabledReason,
   canSimulate,
   canValidate,
   isReadOnlyRole,
@@ -802,6 +803,14 @@ export function FlowEditorPage() {
     valid: validation?.valid === true,
     hasRecentSimulation,
   });
+  const runTooltip =
+    runDisabledReason({
+      role,
+      legacy,
+      dirty,
+      valid: validation?.valid === true,
+      hasRecentSimulation,
+    }) || "Esegui realmente il flusso";
 
   const goBack = async () => {
     const ok = await unsaved.requestLeave();
@@ -838,6 +847,7 @@ export function FlowEditorPage() {
         canValidate={canValidate(role)}
         canSimulate={canSimulate(role) && !dirty}
         canRun={runEnabled}
+        runTooltip={runTooltip}
         canUndo={historyAvailability.canUndo}
         canRedo={historyAvailability.canRedo}
         triggerStatusLine={triggerCriteria?.statusLine}

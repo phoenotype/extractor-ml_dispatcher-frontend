@@ -23,6 +23,7 @@ interface EditorToolbarProps {
   canValidate: boolean;
   canSimulate: boolean;
   canRun: boolean;
+  runTooltip: string;
   canUndo: boolean;
   canRedo: boolean;
   triggerStatusLine?: string | null;
@@ -47,6 +48,7 @@ export function EditorToolbar({
   canValidate,
   canSimulate,
   canRun,
+  runTooltip,
   canUndo,
   canRedo,
   triggerStatusLine,
@@ -142,9 +144,14 @@ export function EditorToolbar({
           >
             <Save size={16} /> {busy === "save" ? "Salvataggio…" : "Salva"}
           </Button>
-          <Button onClick={onRun} disabled={!canRun || !!busy}>
-            <Play size={16} /> Esegui
-          </Button>
+          <span
+            className="button-tooltip-anchor"
+            title={busy ? "Attendi il completamento dell'operazione in corso" : runTooltip}
+          >
+            <Button onClick={onRun} disabled={!canRun || !!busy}>
+              <Play size={16} /> Esegui
+            </Button>
+          </span>
         </div>
       </div>
       {!legacy ? (

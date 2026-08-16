@@ -2880,3 +2880,6 @@ html[data-theme="dark"] .node-issues {
   border-color: #d65d5d;
   background: #fff0f0;
 }
+.button-tooltip-anchor {
+  display: inline-flex;
+}

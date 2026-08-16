@@ -31,11 +31,22 @@ export function canRunNow(options: {
   valid: boolean;
   hasRecentSimulation: boolean;
 }): boolean {
-  return (
-    canRunFlows(options.role) &&
-    !options.legacy &&
-    !options.dirty &&
-    options.valid &&
-    options.hasRecentSimulation
-  );
+  return runDisabledReason(options) === null;
+}
+
+export function runDisabledReason(options: {
+  role: Role;
+  legacy: boolean;
+  dirty: boolean;
+  valid: boolean;
+  hasRecentSimulation: boolean;
+}): string | null {
+  if (!canRunFlows(options.role)) return "Disponibile solo con ruolo operator";
+  if (options.legacy) return "I flussi legacy sono disponibili in sola lettura";
+  if (options.dirty) return "Salva le modifiche prima di eseguire";
+  if (!options.valid) return "Valida il flusso prima di eseguire";
+  if (!options.hasRecentSimulation) {
+    return "Esegui una simulazione valida negli ultimi 30 minuti";
+  }
+  return null;
 }
