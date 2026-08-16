@@ -460,7 +460,7 @@ function DynamicConfigField({
           onChange={(event) => onChange(event.target.value)}
         />
         <small className="field-hint">
-          Usa document e nodes. Assegna sempre l'output JSON a result. Import,
+          Usa document e nodes. Assegna sempre l&apos;output JSON a result. Import,
           filesystem, rete e accesso agli attributi non sono consentiti.
         </small>
       </label>
