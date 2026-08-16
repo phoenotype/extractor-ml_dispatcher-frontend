@@ -36,6 +36,20 @@ export const mockCatalog: Catalog = {
       outputs: ["always"],
     },
     {
+      type: "trigger.schedule",
+      category: "trigger",
+      label: "Scheduler",
+      description: "Avvia periodicamente il flusso",
+      configSchema: {
+        cron: { type: "string", required: true, label: "Espressione cron" },
+        timezone: { type: "string", required: true, label: "Timezone" },
+        batchSize: { type: "number", required: true, label: "Documenti per esecuzione" },
+        exportStatuses: { type: "array", items: "number", required: true, source: "exportStatuses" },
+        documentTypes: { type: "array", items: "string", required: false },
+      },
+      outputs: ["always"],
+    },
+    {
       type: "condition",
       category: "logic",
       label: "Condizione",

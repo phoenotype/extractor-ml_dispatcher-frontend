@@ -208,6 +208,9 @@ export function defaultFieldValue(
     return undefined;
   }
   if (key === "path") return "/";
+  if (key === "cron") return "*/5 * * * *";
+  if (key === "timezone") return "Europe/Rome";
+  if (key === "batchSize") return 25;
   if (key === "successStatusCodes") return [200];
   if (key === "method" && field.type === "enum") return field.values?.[0] ?? "POST";
   if (key === "connectionRef") return "";

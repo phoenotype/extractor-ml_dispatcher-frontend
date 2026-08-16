@@ -787,9 +787,7 @@ export function FlowEditorPage() {
 
   const triggerCriteria = useMemo(() => getFlowTriggerSummary(flow), [flow]);
   const triggerSummaryText = useMemo(() => {
-    const trigger = flow.nodes.find(
-      (node) => node.type === "trigger.export_status",
-    );
+    const trigger = flow.nodes.find((node) => node.type.startsWith("trigger."));
     return trigger ? formatTriggerSummary(trigger.config) : null;
   }, [flow]);
 

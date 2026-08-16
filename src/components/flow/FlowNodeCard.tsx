@@ -13,6 +13,8 @@ export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) 
   const detail =
     def.type === "trigger.export_status"
       ? formatTriggerSummary(def.config)
+      : def.type === "trigger.schedule"
+        ? `${String(def.config.cron || "—")} · ${String(def.config.timezone || "Europe/Rome")}`
       : def.type === "condition"
         ? `${String(def.config.field || "Campo")} · ${String(def.config.operator || "eq")}`
         : def.type === "action.update_export_status"
@@ -32,7 +34,7 @@ export function FlowNodeCard({ data, selected }: NodeProps<Node<FlowNodeData>>) 
       <div className="node-copy">
         <span>{catalogDefinition.label}</span>
         <strong>{def.name}</strong>
-        <small className={def.type === "trigger.export_status" ? "multiline" : undefined}>
+        <small className={def.type.startsWith("trigger.") ? "multiline" : undefined}>
           {detail}
         </small>
       </div>
