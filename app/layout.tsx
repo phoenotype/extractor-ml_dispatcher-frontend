@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "Extractor ML Dispatcher",
   description: "Configura, valida e simula i flussi documentali.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
   },
 };
 
