@@ -147,6 +147,27 @@ export const mockCatalog: Catalog = {
       outputs: ["always"],
     },
     {
+      type: "action.write_document_data",
+      category: "action",
+      label: "Scrivi dati documento",
+      description: "Aggiorna w_doc_batch, w_batch_fields o w_table_fields",
+      configSchema: {
+        target: {
+          type: "enum",
+          values: ["w_doc_batch", "w_batch_fields", "w_table_fields"],
+          required: true,
+        },
+        mode: {
+          type: "enum",
+          values: ["update", "upsert"],
+          required: true,
+        },
+        selector: { type: "any", required: false },
+        values: { type: "any", required: true },
+      },
+      outputs: ["always"],
+    },
+    {
       type: "stop",
       category: "control",
       label: "Termina flusso",

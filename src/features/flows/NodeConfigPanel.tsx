@@ -476,13 +476,16 @@ function DynamicConfigField({
     );
   }
 
-  if (field.type === "any" && (fieldKey === "headers" || fieldKey === "body")) {
+  if (
+    field.type === "any" &&
+    (["headers", "body", "selector", "values"].includes(fieldKey))
+  ) {
     return (
       <JsonConfigField
         label={label}
         value={value}
         disabled={disabled}
-        requireObject={fieldKey === "headers"}
+        requireObject={["headers", "selector", "values"].includes(fieldKey)}
         onChange={onChange}
       />
     );
