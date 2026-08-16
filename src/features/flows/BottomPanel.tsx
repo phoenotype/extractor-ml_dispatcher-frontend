@@ -24,6 +24,7 @@ interface BottomPanelProps {
   onTabChange: (tab: BottomTab) => void;
   validation: ValidationResult | null;
   validationLoading: boolean;
+  onValidationIssueSelect?: (nodeId: string) => void;
   simulationDocs: SimulationDocument[];
   simulationCount?: number | null;
   simulationIndex: number;
@@ -44,6 +45,7 @@ export function BottomPanel({
   onTabChange,
   validation,
   validationLoading,
+  onValidationIssueSelect,
   simulationDocs,
   simulationCount = null,
   simulationIndex,
@@ -105,6 +107,7 @@ export function BottomPanel({
               <ValidationPanel
                 result={validation}
                 loading={validationLoading}
+                onIssueSelect={onValidationIssueSelect}
               />
             ) : null}
             {tab === "simulation" ? (
@@ -136,9 +139,11 @@ export function BottomPanel({
 function ValidationPanel({
   result,
   loading,
+  onIssueSelect,
 }: {
   result: ValidationResult | null;
   loading: boolean;
+  onIssueSelect?: (nodeId: string) => void;
 }) {
   if (loading) {
     return (
@@ -174,11 +179,17 @@ function ValidationPanel({
     <div className="issues">
       <b>{result.issues?.length || 1} problemi da risolvere</b>
       {(result.issues || []).map((issue, index) => (
-        <div key={index}>
+        <button
+          key={index}
+          type="button"
+          disabled={!issue.nodeId || !onIssueSelect}
+          onClick={() => issue.nodeId && onIssueSelect?.(issue.nodeId)}
+          title={issue.nodeId ? `Apri il nodo ${issue.nodeId}` : undefined}
+        >
           <X size={15} />
           <span>{issue.message}</span>
           {issue.nodeId ? <code>{issue.nodeId}</code> : null}
-        </div>
+        </button>
       ))}
     </div>
   );

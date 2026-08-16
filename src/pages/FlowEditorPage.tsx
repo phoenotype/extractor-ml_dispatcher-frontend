@@ -488,10 +488,13 @@ export function FlowEditorPage() {
     if (preliminary.length) {
       const result = { valid: false, issues: preliminary };
       setValidation(result);
+      const firstIssueNodeId = preliminary.find((issue) => issue.nodeId)?.nodeId;
+      if (firstIssueNodeId) setSelectedId(firstIssueNodeId);
       syncGraph(flowToValidate, {
         issues: new Set(
           preliminary.map((i) => i.nodeId).filter(Boolean) as string[],
         ),
+        selectedId: firstIssueNodeId,
       });
       return result;
     }
@@ -926,6 +929,10 @@ export function FlowEditorPage() {
           }}
           validation={validation}
           validationLoading={busy === "validate"}
+          onValidationIssueSelect={(nodeId) => {
+            setSelectedId(nodeId);
+            syncGraph(flow, { selectedId: nodeId });
+          }}
           simulationDocs={simulationDocs}
           simulationCount={simulationCount}
           simulationIndex={simulationIndex}
