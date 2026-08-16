@@ -151,12 +151,33 @@ export interface SimulationRequest {
 
 export interface RunRequest {
   flowName: string;
+  protocol?: number;
   batchSize: number;
   dryRun: boolean;
 }
 
 export interface RunResult {
   [key: string]: unknown;
+}
+
+export interface DispatcherRun {
+  idDispatcherRun?: number;
+  protocol: number;
+  sourceExportStatus: number;
+  targetExportStatus?: number | null;
+  status: string;
+  executionDetail?: Record<string, unknown>;
+  errorDetail?: { message?: string } | null;
+  startedAt: string;
+  finishedAt?: string | null;
+}
+
+export interface ScheduledRun {
+  scheduledFor: string;
+  status: string;
+  executionResult?: Record<string, unknown>;
+  startedAt: string;
+  finishedAt?: string | null;
 }
 
 export type Role = "viewer" | "editor" | "operator";

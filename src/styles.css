@@ -2543,6 +2543,17 @@ html[data-theme="dark"] .field-path-selected {
   overflow: auto;
 }
 .run-batch { font-size: 12px; color: #6d7987; }
+.run-history { padding: 14px 20px; }
+.run-history-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.run-history-head button { display: flex; gap: 6px; align-items: center; }
+.run-history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.run-history-grid h4 { margin: 0 0 8px; }
+.run-history-row { display: grid; grid-template-columns: minmax(90px, auto) auto auto 1fr; gap: 10px; align-items: center; border-bottom: 1px solid var(--border); padding: 7px 0; font-size: 12px; }
+.run-history-row p { grid-column: 1 / -1; margin: 0; color: var(--danger); }
+.run-status { text-transform: uppercase; font-size: 10px; }
+.run-status.completed, .run-status.no_action { color: var(--success); }
+.run-status.failed { color: var(--danger); }
+@media (max-width: 900px) { .run-history-grid { grid-template-columns: 1fr; } }
 html[data-theme="dark"] .flow-table,
 html[data-theme="dark"] .table-row,
 html[data-theme="dark"] .table-main,

@@ -13,6 +13,8 @@ import type {
   FlowListItem,
   RunRequest,
   RunResult,
+  DispatcherRun,
+  ScheduledRun,
   SimulationRequest,
   SimulationResult,
   ValidationResult,
@@ -473,6 +475,8 @@ const mockApi: DispatcherApi = {
       status: "accepted",
     };
   },
+  async listRuns(): Promise<DispatcherRun[]> { return []; },
+  async listScheduledRuns(): Promise<ScheduledRun[]> { return []; },
 };
 
 const liveApi: DispatcherApi = {
@@ -626,11 +630,24 @@ const liveApi: DispatcherApi = {
       method: "POST",
       body: JSON.stringify({
         flowName: body.flowName || flowName,
+        protocol: body.protocol,
         batchSize: body.batchSize,
         dryRun: body.dryRun,
       }),
     });
     return (payload ?? {}) as RunResult;
+  },
+
+  async listRuns(flowName, options): Promise<DispatcherRun[]> {
+    const query = new URLSearchParams({ limit: String(options?.limit ?? 50) });
+    if (options?.protocol != null) query.set("protocol", String(options.protocol));
+    const payload = await requestJson(`/flows/${encodeName(flowName)}/runs?${query}`) as { items?: DispatcherRun[] };
+    return payload.items ?? [];
+  },
+
+  async listScheduledRuns(flowName, limit = 50): Promise<ScheduledRun[]> {
+    const payload = await requestJson(`/flows/${encodeName(flowName)}/scheduled-runs?limit=${limit}`) as { items?: ScheduledRun[] };
+    return payload.items ?? [];
   },
 };
 

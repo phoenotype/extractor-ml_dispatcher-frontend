@@ -6,6 +6,8 @@ import type {
   FlowListItem,
   RunRequest,
   RunResult,
+  DispatcherRun,
+  ScheduledRun,
   SimulationRequest,
   SimulationResult,
   ValidationResult,
@@ -73,6 +75,8 @@ export interface DispatcherApi {
     body: SimulationRequest,
   ): Promise<ApiResult<SimulationResult>>;
   run(flowName: string, body: RunRequest): Promise<RunResult>;
+  listRuns(flowName: string, options?: { limit?: number; protocol?: number }): Promise<DispatcherRun[]>;
+  listScheduledRuns(flowName: string, limit?: number): Promise<ScheduledRun[]>;
 }
 
 export type {

@@ -7,8 +7,10 @@ interface RunConfirmDialogProps {
   open: boolean;
   flowName: string;
   batchSize: number;
+  protocol: string;
   busy?: boolean;
   onClose: () => void;
+  onProtocolChange: (value: string) => void;
   onConfirm: () => void;
 }
 
@@ -16,8 +18,10 @@ export function RunConfirmDialog({
   open,
   flowName,
   batchSize,
+  protocol,
   busy,
   onClose,
+  onProtocolChange,
   onConfirm,
 }: RunConfirmDialogProps) {
   const [typed, setTyped] = useState("");
@@ -35,6 +39,16 @@ export function RunConfirmDialog({
       }}
     >
       <p className="run-batch">Batch size: {batchSize}</p>
+      <label>
+        Protocollo specifico <span className="field-optional">(opzionale)</span>
+        <input
+          type="number"
+          min="1"
+          value={protocol}
+          onChange={(event) => onProtocolChange(event.target.value)}
+          placeholder="Vuoto per eseguire il batch"
+        />
+      </label>
       <label>
         Digita <code>{flowName}</code> per confermare
         <input

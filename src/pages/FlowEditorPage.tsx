@@ -65,6 +65,8 @@ import type {
   FlowDetail,
   FlowNodeDefinition,
   SimulationDocument,
+  DispatcherRun,
+  ScheduledRun,
   ValidationResult,
 } from "@/types/flow";
 
@@ -117,6 +119,8 @@ export function FlowEditorPage() {
   const [conflictRemote, setConflictRemote] = useState<FlowDetail | null>(null);
   const [protocol, setProtocol] = useState("");
   const [batchSize, setBatchSize] = useState(1);
+  const [runs, setRuns] = useState<DispatcherRun[]>([]);
+  const [scheduledRuns, setScheduledRuns] = useState<ScheduledRun[]>([]);
   const [executeSimulationHttp, setExecuteSimulationHttp] = useState(false);
   const [jsonDraft, setJsonDraft] = useState("");
   const [jsonError, setJsonError] = useState<string | null>(null);
@@ -720,11 +724,13 @@ export function FlowEditorPage() {
         flowName: flow.flowName,
         body: {
           flowName: flow.flowName,
+          protocol: protocol ? Number(protocol) : undefined,
           batchSize,
           dryRun: false,
         },
       });
-      setNotice("Esecuzione accettata dal backend");
+      setNotice(protocol ? `Esecuzione completata per il protocollo ${protocol}` : "Esecuzione batch completata");
+      await refreshRuns();
     } catch (error) {
       setNotice(
         error instanceof ApiError ? error.message : "Esecuzione non riuscita",
@@ -732,6 +738,21 @@ export function FlowEditorPage() {
     } finally {
       setBusy(null);
     }
+  };
+
+  const refreshRuns = async () => {
+    if (isNew) return;
+    setBusy("runs");
+    try {
+      const [documentRuns, scheduleRuns] = await Promise.all([
+        dispatcherApi.listRuns(flow.flowName, { limit: 50 }),
+        dispatcherApi.listScheduledRuns(flow.flowName, 25),
+      ]);
+      setRuns(documentRuns);
+      setScheduledRuns(scheduleRuns);
+    } catch (error) {
+      setNotice(error instanceof ApiError ? error.message : "Storico esecuzioni non disponibile");
+    } finally { setBusy(null); }
   };
 
   const undo = () => {
@@ -969,6 +990,10 @@ export function FlowEditorPage() {
           simulationIndex={simulationIndex}
           onSimulationIndexChange={setSimulationIndex}
           simulationLoading={busy === "simulate"}
+          runs={runs}
+          scheduledRuns={scheduledRuns}
+          runsLoading={busy === "runs"}
+          onRefreshRuns={() => void refreshRuns()}
           triggerSummary={triggerSummaryText}
           jsonDraft={jsonDraft}
           jsonError={jsonError}
@@ -995,8 +1020,10 @@ export function FlowEditorPage() {
         open={showRunModal}
         flowName={flow.flowName}
         batchSize={batchSize}
+        protocol={protocol}
         busy={busy === "run"}
         onClose={() => setShowRunModal(false)}
+        onProtocolChange={setProtocol}
         onConfirm={() => void doRun()}
       />
 
